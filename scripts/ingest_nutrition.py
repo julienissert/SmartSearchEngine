@@ -6,20 +6,25 @@ python scripts/ingest_nutrition.py nutrition.csv
 CSV example columns: name, description, calories_per_100g
 """
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+sys.path.append(ROOT)
 import pandas as pd
 import numpy as np
 from app.retriever import retriever
 from app.embed import embed_text
-import os
+
 
 def main(path):
     df = pd.read_csv(path)
     items = []
     for _, row in df.iterrows():
         name = str(row.get("food", ""))
-        desc = str(row.get("Fat", name))
+        desc = str(row.get("description", name))
         calories = row.get("Caloric Value", None)
         emb = embed_text(desc)
         meta = {"id": f"nutrition/{len(retriever.metadatas)+len(items)}", "domain": "food", "name": name, "Caloric Value": float(calories) if calories is not None else None, "text": desc}
