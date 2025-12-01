@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+transformers
+torch
+Pillow
+faiss-cpu
+pytesseract
+pandas
+python-multipart
+aiofiles
