@@ -213,7 +213,7 @@ datasets/
 
 # --- Fichiers Générés par le Script ---
 # On ignore les résultats de l'ingestion, car ils sont recréés à chaque lancement
-metadata_db.json
+#metadata_db.json
 vector_indexes/
 src/vector_indexes/
 

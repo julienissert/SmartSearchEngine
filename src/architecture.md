@@ -2,8 +2,7 @@ datasets/
 ├── drugs-list/
 ├── fast-food-nutrition/
 ├── food-101/
-├── food-nutrition/
-scripts/
+src/
 │
 ├── ingestion/
 │   ├── csv_ingestion.py
@@ -11,21 +10,21 @@ scripts/
 │   ├── txt_ingestion.py
 │   ├── image_ingestion.py
 │   ├── h5_ingestion.py
-│   ├── folder_scanner.py      # parcours dossier
-│   └── dispatcher.py          # sélection du loader selon le fichier
+│   ├── folder_scanner.py      
+│   └── dispatcher.py          
 │
 ├── embeddings/
-│   ├── text_embeddings.py     # embed_text()
-│   └── image_embeddings.py    # embed_image()
+│   ├── text_embeddings.py     
+│   └── image_embeddings.py    
 │
 ├── indexing/
-│   ├── faiss_index.py         # index vectoriel
-│   └── metadata_index.py      # heuristiques de domaine / nettoyage
+│   ├── faiss_index.py         
+│   └── metadata_index.py     
 │
 ├── utils/
-│   ├── preprocessing.py       # clean texte
-│   ├── label_detector.py       # clean texte
-│   └── domain_detector.py     # détecte domaine food/medical
+│   ├── preprocessing.py       
+│   ├── label_detector.py     
+│   └── domain_detector.py    
 │
 ├── config.py
-└── main.py                    # pipeline d’ingestion complet
+└── main.py                   

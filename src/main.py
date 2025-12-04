@@ -1,5 +1,6 @@
 import os
 import json
+import time  
 import config
 from ingestion.folder_scanner import scan_folder
 from ingestion.dispatcher import dispatch_loader 
@@ -17,15 +18,13 @@ def process_document(doc, valid_labels):
     image = doc.get("image", None)
     source_path = doc["source"]
     
-    # 1. Détection du Domaine (Food vs Medical)
+    # 1. Domaine & Score
     domain, domain_scores = detect_domain(text=str(content), pil_image=image)
     
-    # 2. Détection du Label
-    # Priorité absolue au label suggéré par le loader (ex: colonne "Item" d'un CSV)
+    # 2. Label (Priorité Suggestion)
     if doc.get("suggested_label"):
         label = doc["suggested_label"]
     else:
-        # Sinon, détection standard via dossier, texte ou vision
         label = detect_label(
             filepath=source_path, 
             text=str(content), 
@@ -33,10 +32,10 @@ def process_document(doc, valid_labels):
             known_labels=valid_labels
         )
     
-    # 3. Vectorisation (Embedding 512 dims)
+    # 3. Vectorisation
     vector = embed_image(image) if image else embed_text(str(content))
 
-    # 4. Stockage FAISS + Métadonnées
+    # 4. Stockage
     if vector is not None:
         add_to_index(domain, vector)
 
@@ -49,7 +48,11 @@ def process_document(doc, valid_labels):
         "snippet": str(content)[:200] if content else ""
     })
     
-    print(f"Traité: {os.path.basename(source_path)} -> Label: {label}")
+    confidence = domain_scores.get(domain, 0.0)
+    print(f"Traîté: {os.path.basename(source_path)}")
+    print(f"   -> Label  : {label}")
+    print(f"   -> Domaine: {domain.upper()} ({confidence:.2f})")
+    print("-" * 20)
 
 def save_metadata_to_disk():
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
@@ -57,26 +60,39 @@ def save_metadata_to_disk():
     print(f"Sauvegarde terminée dans {METADATA_FILE}")
 
 def main():
+    start_time = time.time()
+    
     if not os.path.exists(config.DATASET_DIR):
         print(f"Erreur: Dossier {config.DATASET_DIR} introuvable.")
         return
 
-    # Phase 1 : Analyse intelligente de la structure du dataset
     valid_labels = analyze_dataset_structure(config.DATASET_DIR)
 
     print("Début de l'ingestion des fichiers...")
     files = scan_folder(config.DATASET_DIR)
+    
+    total_docs = 0 
 
-    # Phase 2 : Traitement fichier par fichier
     for f in files:
         try:
             docs = dispatch_loader(f)
             for d in docs:
                 process_document(d, valid_labels)
+                total_docs += 1
         except Exception as e:
             print(f"Erreur sur {f}: {e}")
 
     save_metadata_to_disk()
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    print("\n" + "="*40)
+    print(f" INGESTION TERMINÉE")
+    print(f" Temps total : {duration:.2f} secondes")
+    if total_docs > 0:
+        print(f"Vitesse moy : {duration/total_docs:.4f} s/doc")
+    print("="*40)
 
 if __name__ == "__main__":
     main()
