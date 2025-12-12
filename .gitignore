@@ -209,7 +209,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-datasets/
+raw-datasets/
 
 # --- Fichiers Générés par le Script ---
 # On ignore les résultats de l'ingestion, car ils sont recréés à chaque lancement

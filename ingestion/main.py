@@ -11,7 +11,7 @@ from indexing.metadata_index import store_metadata, get_all_metadata
 from utils.domain_detector import detect_domain
 from utils.label_detector import detect_label, analyze_dataset_structure
 
-METADATA_FILE = "metadata_db.json"
+METADATA_FILE = "/computed-data/metadata_db.json"
 
 def process_document(doc, valid_labels):
     content = doc.get("content", "")
