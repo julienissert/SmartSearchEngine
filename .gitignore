@@ -84,6 +84,8 @@ ipython_config.py
 
 # Datasets
 *.csv
+*.jpg
+*.h5
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
@@ -209,7 +211,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-raw-datasets/
+# Ignore datasets folder
+raw-datasets-01/*
+
+# Do not ignore the dataasets folder README.md
+!raw-datasets-01/README.md
 
 # --- Fichiers Générés par le Script ---
 # On ignore les résultats de l'ingestion, car ils sont recréés à chaque lancement
