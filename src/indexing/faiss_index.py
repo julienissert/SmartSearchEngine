@@ -5,6 +5,19 @@ import faiss
 import numpy as np
 import config
 
+indexes = {}
+
+def load_all_indexes():
+    global indexes
+    if not os.path.exists(config.INDEX_DIR):
+        return
+    
+    for filename in os.listdir(config.INDEX_DIR):
+        if filename.endswith(".index"):
+            domain = filename.replace(".index", "")
+            path = os.path.join(config.INDEX_DIR, filename)
+            indexes[domain] = faiss.read_index(path)
+            
 def get_index_path(domain):
     return os.path.join(config.FAISS_INDEX_DIR, f"{domain}.index")
 

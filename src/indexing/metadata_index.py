@@ -5,6 +5,15 @@ import config
 
 metadata_store = []
 
+def load_metadata_from_disk():
+    global metadata_store
+    if os.path.exists(config.METADATA_FILE):
+        with open(config.METADATA_FILE, "r", encoding="utf-8") as f:
+            metadata_store = json.load(f)
+        print(f"📖 {len(metadata_store)} documents chargés depuis le cache.")
+    else:
+        metadata_store = []
+        
 def store_metadata(entry):
     doc_id = len(metadata_store) 
     entry["id"] = doc_id
@@ -36,3 +45,4 @@ def get_metadata_by_id(doc_id):
         return metadata_store[doc_id]
     except (IndexError, TypeError):
         return None
+    
