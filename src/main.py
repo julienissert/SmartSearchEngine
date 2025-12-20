@@ -1,20 +1,29 @@
 # src/main.py
-import os
 import sys
 import argparse
 import uvicorn
+from pathlib import Path
+from utils.environment import check_environment
+from utils.logger import setup_logger
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = Path(__file__).resolve().parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.append(str(SRC_DIR))
 
-if SRC_DIR not in sys.path:
-    sys.path.append(SRC_DIR)
+
+
+logger = setup_logger("Orchestrator")
 
 def main():
-    parser = argparse.ArgumentParser(description="MAYbe Here - SmartSearchEngine CLI")
+    # --- 1. PRE-FLIGHT CHECK ---
+    check_environment()
+
+    # --- 2. GESTION DU CLI ---
+    parser = argparse.ArgumentParser(description="SmartSearchEngine CLI")
     parser.add_argument(
         "mode", 
         choices=["ingest", "serve"], 
-        help="Lancer l'ingestion des données (ingest) ou le serveur de recherche (serve)"
+        help="Lancer l'ingestion (ingest) ou le serveur API (serve)"
     )
 
     if len(sys.argv) == 1:
@@ -23,20 +32,20 @@ def main():
 
     args = parser.parse_args()
 
+    # --- 3. EXÉCUTION DU MODE ---
     if args.mode == "ingest":
-        print("Mode : Ingestion des données en cours...")
+        logger.info("🏗️ Mode : Ingestion des données")
         from ingestion.main import main as run_ingestion
         run_ingestion()
 
     elif args.mode == "serve":
-        print("Mode : Lancement du serveur Search API (FastAPI)")
+        logger.info("🚀 Mode : Lancement du serveur Search API")
         
         uvicorn.run(
-            "search.main:app", 
+            "search.routes:app", 
             host="0.0.0.0", 
             port=8000, 
-            reload=True,
-            app_dir=SRC_DIR
+            reload=True
         )
 
 if __name__ == "__main__":

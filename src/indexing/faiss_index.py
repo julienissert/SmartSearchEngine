@@ -9,7 +9,7 @@ indexes = {}
 
 def load_all_indexes():
     global indexes
-    if not os.path.exists(config.INDEX_DIR):
+    if not os.path.exists(config.INDEX_DIR):    
         return
     
     for filename in os.listdir(config.INDEX_DIR):

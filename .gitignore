@@ -235,3 +235,6 @@ thumbs.db
 # Logs
 logs/
 *.log
+
+# --- Environnement ---
+.env

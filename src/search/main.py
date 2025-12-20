@@ -1,11 +1,21 @@
-# src/search/main.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from .routes import router
+from search.routes import router
+from utils.logger import setup_logger
+
+logger = setup_logger("SearchAPI")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(" L'API de recherche est prête et opérationnelle.")
+    yield
+    logger.info(" Arrêt de l'API de recherche.")
 
 app = FastAPI(
     title="MAYbe Here - Search API",
     description="API de recherche multimodale Food & Medical",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.include_router(router)
