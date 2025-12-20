@@ -212,10 +212,10 @@ marimo/_lsp/
 __marimo__/
 
 # Ignore datasets folder
-raw-datasets-01/*
+raw-datasets/*
 
 # Do not ignore the dataasets folder README.md
-!raw-datasets-01/README.md
+!raw-datasets/README.md
 
 # --- Fichiers Générés par le Script ---
 # On ignore les résultats de l'ingestion, car ils sont recréés à chaque lancement

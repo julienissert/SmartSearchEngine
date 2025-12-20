@@ -1,5 +1,4 @@
-import os
-from ingestion.dispatcher import dispatch_loader
+# src/ingestion/core.py
 from embeddings.text_embeddings import embed_text
 from embeddings.image_embeddings import embed_image
 from indexing.faiss_index import add_to_index
@@ -12,23 +11,28 @@ def process_document(doc, valid_labels):
     image = doc.get("image", None)
     source_path = doc["source"]
     
+    # 1. Détection du domaine 
     domain, _ = detect_domain(text=str(content), pil_image=image)
     
+    # 2. Détection du label
     label = doc.get("suggested_label") or detect_label(
         filepath=source_path, text=str(content), image=image, known_labels=valid_labels
     )
     
+    # 3. Calcul de l'embedding 
     vector = embed_image(image) if image else embed_text(str(content))
 
+    # 4. Stockage dans le JSON du domaine correspondant
     doc_id = store_metadata({
         "source": source_path,
         "type": doc["type"],
         "domain": domain,
         "label": label,
         "snippet": str(content)[:200] if content else ""
-    })
+    }, domain) 
 
+    # 5. Ajout à l'index FAISS du domaine correspondant
     if vector is not None:
         add_to_index(domain, vector, doc_id)
     
-    return domain 
+    return domain

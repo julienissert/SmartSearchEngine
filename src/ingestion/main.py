@@ -8,11 +8,10 @@ logger = setup_logger("IngestionCLI")
 
 def main():
     start_time = time.time()
-    
-    # 1. Interaction Utilisateur
     mode = 'r'  
-    if config.METADATA_FILE.exists():
-        print(f"\n Base existante détectée ({config.METADATA_FILE})")
+    
+    if config.METADATA_DIR.exists() and any(config.METADATA_DIR.iterdir()):
+        print(f"\n Base existante détectée dans : {config.METADATA_DIR}")
         choice = input("Voulez-vous (R)éinitialiser ou (C)ompléter la base ? [R/C] : ").lower()
         if choice == 'c':
             mode = 'c'

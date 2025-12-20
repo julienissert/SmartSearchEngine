@@ -25,6 +25,7 @@ def check_environment():
     # 3. Validation de la structure des dossiers générés
     config.COMPUTED_DIR.mkdir(parents=True, exist_ok=True)
     config.FAISS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    config.METADATA_DIR.mkdir(parents=True, exist_ok=True) 
     
     logger.info("Structure de l'application validée.")
     return True

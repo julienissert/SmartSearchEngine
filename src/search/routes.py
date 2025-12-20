@@ -13,13 +13,8 @@ async def search_endpoint(image: UploadFile = File(...)):
     img_bytes = await image.read()
     pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     
-    # 1. Analyse
-    vector, ocr_text = analyze_query(pil_img)
-    
-    # 2. Recherche vectorielle
-    matches = retriever.search(vector, k=5)
-    
-    # 3. Composition (Plus besoin de refresh() ici, gain de performance !)
+    image_vector, ocr_text = analyze_query(pil_img)
+    matches = retriever.search(image_vector, query_ocr=ocr_text, k=5)
     response = composer.build_response(matches, ocr_text)
     
     return response

@@ -12,4 +12,6 @@ IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32")
 DATASET_DIR = BASE_DIR / "raw-datasets"
 COMPUTED_DIR = BASE_DIR / "computed-data"
 FAISS_INDEX_DIR = COMPUTED_DIR / "indexes"
-METADATA_FILE = COMPUTED_DIR / "metadata_db.json"
+METADATA_DIR = COMPUTED_DIR / "metadata"
+EMBEDDING_DIM = 512
+TARGET_DOMAINS = ["food", "medical"]

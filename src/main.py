@@ -34,15 +34,15 @@ def main():
 
     # --- 3. EXÉCUTION DU MODE ---
     if args.mode == "ingest":
-        logger.info("🏗️ Mode : Ingestion des données")
+        logger.info("Mode : Ingestion des données")
         from ingestion.main import main as run_ingestion
         run_ingestion()
 
     elif args.mode == "serve":
-        logger.info("🚀 Mode : Lancement du serveur Search API")
+        logger.info(" Mode : Lancement du serveur Search API")
         
         uvicorn.run(
-            "search.routes:app", 
+            "search.main:app", 
             host="0.0.0.0", 
             port=8000, 
             reload=True
