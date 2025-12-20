@@ -1,6 +1,7 @@
 # src/ingestion/service.py
 import os
 import config
+from tqdm import tqdm  
 from ingestion.folder_scanner import scan_folder
 from ingestion.dispatcher import dispatch_loader
 from ingestion.core import process_document
@@ -19,7 +20,6 @@ logger = setup_logger("IngestionService")
 class IngestionService:
     @staticmethod
     def prepare_database(mode='r'):
-        """Initialise ou charge la base de données selon le mode."""
         if mode == 'r':
             reset_all_indexes()
             clear_metadata()
@@ -49,20 +49,21 @@ class IngestionService:
 
     @staticmethod
     def run_workflow(mode='r'):
+        """Exécute la logique complète d'ingestion avec suivi par barre de progression."""
         logger.info("--- Démarrage d'un nouveau workflow d'ingestion ---")
         
-        # 1. Préparation
+        # 1. Préparation des index et métadonnées
         IngestionService.prepare_database(mode)
         
-        # 2. Analyse structurelle
+        # 2. Analyse de la structure pour valider les domaines (food, medical, etc.)
         valid_labels = analyze_dataset_structure(config.DATASET_DIR)
         
-        # 3. Récupération des fichiers
+        # 3. Liste des fichiers à traiter
         files_to_process = IngestionService.get_files_to_ingest(mode)
         
-        # 4. Traitement
+        # 4. Traitement avec barre de progression dynamique
         new_docs_count = 0
-        for f in files_to_process:
+        for f in tqdm(files_to_process, desc="Ingestion des fichiers", unit="file"):
             try:
                 for doc in dispatch_loader(f):
                     process_document(doc, valid_labels)
@@ -71,7 +72,7 @@ class IngestionService:
                 logger.error(f"Erreur critique sur le fichier {f} : {str(e)}")
                 continue 
 
-        # 5. Sauvegarde
+        # 5. Sauvegarde finale des métadonnées enrichies
         if new_docs_count > 0:
             save_metadata_to_disk()
             logger.info(f"Sauvegarde réussie : {new_docs_count} nouveaux documents indexés.")
