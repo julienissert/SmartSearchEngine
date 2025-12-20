@@ -231,3 +231,7 @@ thumbs.db
 
 # --- Logs & Debug ---
 *.log
+
+# Logs
+logs/
+*.log

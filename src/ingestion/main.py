@@ -24,7 +24,7 @@ def main():
         # 3. Affichage du résumé final
         duration = time.time() - start_time
         print("\n" + "="*40)
-        print("✨ INGESTION TERMINÉE")
+        print("INGESTION TERMINÉE")
         print(f"Fichiers analysés     : {total_files}")
         print(f"Documents indexés     : {new_docs}")
         print(f"Temps total           : {duration:.2f} secondes")
