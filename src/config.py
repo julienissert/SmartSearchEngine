@@ -15,3 +15,8 @@ FAISS_INDEX_DIR = COMPUTED_DIR / "indexes"
 METADATA_DIR = COMPUTED_DIR / "metadata"
 EMBEDDING_DIM = 512
 TARGET_DOMAINS = ["food", "medical"]
+
+# Paramètres de Recherche
+SEARCH_LARGE_K = 100       # Profondeur d'exploration pour trouver le texte
+CONSENSUS_THRESHOLD = 15   # Nombre de voisins pour voter le label
+MAX_CONFIRMATION_IMAGES = 3 # Nombre d'images de preuve à garder
