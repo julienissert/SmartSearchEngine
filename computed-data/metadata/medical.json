@@ -1,0 +1,263 @@
+[
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir",
+        "domain_score": 0.5046,
+        "snippet": "abacavir",
+        "id": 0
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir dolutegravir and lamivudine",
+        "domain_score": 0.5083,
+        "snippet": "abacavir dolutegravir and lamivudine",
+        "id": 1
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir and lamivudine",
+        "domain_score": 0.5026,
+        "snippet": "abacavir and lamivudine",
+        "id": 2
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir and lamivudine tablets",
+        "domain_score": 0.5056,
+        "snippet": "abacavir and lamivudine tablets",
+        "id": 3
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir lamivudine and zidovudine",
+        "domain_score": 0.5027,
+        "snippet": "abacavir lamivudine and zidovudine",
+        "id": 4
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir lamivudine and zidovudine tablets",
+        "domain_score": 0.5061,
+        "snippet": "abacavir lamivudine and zidovudine tablets",
+        "id": 5
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir oral solution",
+        "domain_score": 0.5088,
+        "snippet": "abacavir oral solution",
+        "id": 6
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir sulfate",
+        "domain_score": 0.5045,
+        "snippet": "abacavir sulfate",
+        "id": 7
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir sulfate tablets",
+        "domain_score": 0.5022,
+        "snippet": "abacavir sulfate tablets",
+        "id": 8
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abacavir tablets",
+        "domain_score": 0.5045,
+        "snippet": "abacavir tablets",
+        "id": 9
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abaloparatide",
+        "domain_score": 0.5067,
+        "snippet": "abaloparatide",
+        "id": 10
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abaloparatide subcutaneous",
+        "domain_score": 0.5143,
+        "snippet": "abaloparatide subcutaneous",
+        "id": 11
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abametapir",
+        "domain_score": 0.5028,
+        "snippet": "abametapir",
+        "id": 12
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatacept",
+        "domain_score": 0.5045,
+        "snippet": "abatacept",
+        "id": 13
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatacept auto injectors",
+        "domain_score": 0.5078,
+        "snippet": "abatacept auto injectors",
+        "id": 14
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatacept infusion",
+        "domain_score": 0.5096,
+        "snippet": "abatacept infusion",
+        "id": 15
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatacept intravenous",
+        "domain_score": 0.5119,
+        "snippet": "abatacept intravenous",
+        "id": 16
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatacept prefilled syringes",
+        "domain_score": 0.5101,
+        "snippet": "abatacept prefilled syringes",
+        "id": 17
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatron",
+        "domain_score": 0.5026,
+        "snippet": "abatron",
+        "id": 18
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abatuss dmx",
+        "domain_score": 0.5041,
+        "snippet": "abatuss dmx",
+        "id": 19
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abbokinase",
+        "domain_score": 0.5049,
+        "snippet": "abbokinase",
+        "id": 20
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abciximab",
+        "domain_score": 0.5103,
+        "snippet": "abciximab",
+        "id": 21
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abciximab intravenous",
+        "domain_score": 0.514,
+        "snippet": "abciximab intravenous",
+        "id": 22
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abdek",
+        "domain_score": 0.5012,
+        "snippet": "abdek",
+        "id": 23
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abelcet",
+        "domain_score": 0.5064,
+        "snippet": "abelcet",
+        "id": 24
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abemaciclib",
+        "domain_score": 0.508,
+        "snippet": "abemaciclib",
+        "id": 25
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\Drugs\\drugs.txt",
+        "type": "txt",
+        "domain": "medical",
+        "label": "abenol",
+        "domain_score": 0.5036,
+        "snippet": "abenol",
+        "id": 26
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\images\\apple_pie\\484038.jpg",
+        "type": "image",
+        "domain": "medical",
+        "label": "apple_pie",
+        "domain_score": 0.5242,
+        "snippet": "",
+        "id": 27
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\images\\apple_pie\\755031.jpg",
+        "type": "image",
+        "domain": "medical",
+        "label": "apple_pie",
+        "domain_score": 0.5183,
+        "snippet": "",
+        "id": 28
+    }
+]
