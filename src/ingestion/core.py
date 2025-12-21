@@ -11,8 +11,8 @@ def process_document(doc, valid_labels):
     image = doc.get("image", None)
     source_path = doc["source"]
     
-    # 1. Détection du domaine 
-    domain, _ = detect_domain(text=str(content), pil_image=image)
+    # 1. Détection du domaine (On récupère maintenant domain_scores)
+    domain, domain_scores = detect_domain(text=str(content), pil_image=image)
     
     # 2. Détection du label
     label = doc.get("suggested_label") or detect_label(
@@ -22,16 +22,17 @@ def process_document(doc, valid_labels):
     # 3. Calcul de l'embedding 
     vector = embed_image(image) if image else embed_text(str(content))
 
-    # 4. Stockage dans le JSON du domaine correspondant
+    # 4. Stockage dans le JSON (On ajoute domain_scores ici)
     doc_id = store_metadata({
         "source": source_path,
         "type": doc["type"],
         "domain": domain,
         "label": label,
+        "domain_scores": domain_scores,  
         "snippet": str(content)[:200] if content else ""
     }, domain) 
 
-    # 5. Ajout à l'index FAISS du domaine correspondant
+    # 5. Ajout à l'index FAISS
     if vector is not None:
         add_to_index(domain, vector, doc_id)
     

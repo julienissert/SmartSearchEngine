@@ -31,6 +31,7 @@ class ResultComposer:
                     "domain": domain,
                     "label": data.get("label"),
                     "source": data.get("source"),
+                    "domain_scores": data.get("domain_scores"), 
                     "snippet": data.get("snippet"),
                     "match_score": m["score"],
                     "origin": m.get("origin", "unknown") 
