@@ -4,7 +4,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir",
-        "domain_score": 0.5046,
+        "domain_score": 0.8517,
         "snippet": "abacavir",
         "id": 0
     },
@@ -13,7 +13,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir dolutegravir and lamivudine",
-        "domain_score": 0.5083,
+        "domain_score": 0.9474,
         "snippet": "abacavir dolutegravir and lamivudine",
         "id": 1
     },
@@ -22,7 +22,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir and lamivudine",
-        "domain_score": 0.5026,
+        "domain_score": 0.7408,
         "snippet": "abacavir and lamivudine",
         "id": 2
     },
@@ -31,7 +31,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir and lamivudine tablets",
-        "domain_score": 0.5056,
+        "domain_score": 0.8581,
         "snippet": "abacavir and lamivudine tablets",
         "id": 3
     },
@@ -40,7 +40,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir lamivudine and zidovudine",
-        "domain_score": 0.5027,
+        "domain_score": 0.7203,
         "snippet": "abacavir lamivudine and zidovudine",
         "id": 4
     },
@@ -49,7 +49,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir lamivudine and zidovudine tablets",
-        "domain_score": 0.5061,
+        "domain_score": 0.8624,
         "snippet": "abacavir lamivudine and zidovudine tablets",
         "id": 5
     },
@@ -58,7 +58,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir oral solution",
-        "domain_score": 0.5088,
+        "domain_score": 0.9538,
         "snippet": "abacavir oral solution",
         "id": 6
     },
@@ -67,7 +67,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir sulfate",
-        "domain_score": 0.5045,
+        "domain_score": 0.8338,
         "snippet": "abacavir sulfate",
         "id": 7
     },
@@ -76,7 +76,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir sulfate tablets",
-        "domain_score": 0.5022,
+        "domain_score": 0.6953,
         "snippet": "abacavir sulfate tablets",
         "id": 8
     },
@@ -85,7 +85,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abacavir tablets",
-        "domain_score": 0.5045,
+        "domain_score": 0.8262,
         "snippet": "abacavir tablets",
         "id": 9
     },
@@ -94,7 +94,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abaloparatide",
-        "domain_score": 0.5067,
+        "domain_score": 0.9271,
         "snippet": "abaloparatide",
         "id": 10
     },
@@ -103,7 +103,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abaloparatide subcutaneous",
-        "domain_score": 0.5143,
+        "domain_score": 0.9904,
         "snippet": "abaloparatide subcutaneous",
         "id": 11
     },
@@ -112,7 +112,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abametapir",
-        "domain_score": 0.5028,
+        "domain_score": 0.7221,
         "snippet": "abametapir",
         "id": 12
     },
@@ -121,7 +121,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatacept",
-        "domain_score": 0.5045,
+        "domain_score": 0.8565,
         "snippet": "abatacept",
         "id": 13
     },
@@ -130,7 +130,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatacept auto injectors",
-        "domain_score": 0.5078,
+        "domain_score": 0.9261,
         "snippet": "abatacept auto injectors",
         "id": 14
     },
@@ -139,7 +139,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatacept infusion",
-        "domain_score": 0.5096,
+        "domain_score": 0.9705,
         "snippet": "abatacept infusion",
         "id": 15
     },
@@ -148,7 +148,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatacept intravenous",
-        "domain_score": 0.5119,
+        "domain_score": 0.9848,
         "snippet": "abatacept intravenous",
         "id": 16
     },
@@ -157,7 +157,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatacept prefilled syringes",
-        "domain_score": 0.5101,
+        "domain_score": 0.9694,
         "snippet": "abatacept prefilled syringes",
         "id": 17
     },
@@ -166,7 +166,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatron",
-        "domain_score": 0.5026,
+        "domain_score": 0.7423,
         "snippet": "abatron",
         "id": 18
     },
@@ -175,7 +175,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abatuss dmx",
-        "domain_score": 0.5041,
+        "domain_score": 0.8251,
         "snippet": "abatuss dmx",
         "id": 19
     },
@@ -184,7 +184,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abbokinase",
-        "domain_score": 0.5049,
+        "domain_score": 0.856,
         "snippet": "abbokinase",
         "id": 20
     },
@@ -193,7 +193,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abciximab",
-        "domain_score": 0.5103,
+        "domain_score": 0.9738,
         "snippet": "abciximab",
         "id": 21
     },
@@ -202,7 +202,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abciximab intravenous",
-        "domain_score": 0.514,
+        "domain_score": 0.9897,
         "snippet": "abciximab intravenous",
         "id": 22
     },
@@ -211,7 +211,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abdek",
-        "domain_score": 0.5012,
+        "domain_score": 0.6475,
         "snippet": "abdek",
         "id": 23
     },
@@ -220,7 +220,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abelcet",
-        "domain_score": 0.5064,
+        "domain_score": 0.9123,
         "snippet": "abelcet",
         "id": 24
     },
@@ -229,7 +229,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abemaciclib",
-        "domain_score": 0.508,
+        "domain_score": 0.9511,
         "snippet": "abemaciclib",
         "id": 25
     },
@@ -238,7 +238,7 @@
         "type": "txt",
         "domain": "medical",
         "label": "abenol",
-        "domain_score": 0.5036,
+        "domain_score": 0.8115,
         "snippet": "abenol",
         "id": 26
     },
@@ -247,7 +247,7 @@
         "type": "image",
         "domain": "medical",
         "label": "apple_pie",
-        "domain_score": 0.5242,
+        "domain_score": 0.8435,
         "snippet": "",
         "id": 27
     },
@@ -256,7 +256,7 @@
         "type": "image",
         "domain": "medical",
         "label": "apple_pie",
-        "domain_score": 0.5183,
+        "domain_score": 0.8286,
         "snippet": "",
         "id": 28
     }

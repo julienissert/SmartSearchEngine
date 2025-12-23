@@ -1,13 +1,14 @@
 # src/ingestion/folder_scanner.py
 import os
-
-VALID_EXT = [".csv", ".pdf", ".png", ".jpg", ".jpeg", ".h5", ".hdf5", ".txt", ".bmp", ".tiff"]
+from ingestion.dispatcher import get_supported_extensions 
 
 def scan_folder(folder):
     files = []
+    valid_extensions = get_supported_extensions()
+    
     for root, _, filenames in os.walk(folder):
         for name in filenames:
             ext = os.path.splitext(name)[1].lower()
-            if ext in VALID_EXT:
+            if ext in valid_extensions:
                 files.append(os.path.join(root, name))
     return files

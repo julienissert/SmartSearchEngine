@@ -65,7 +65,7 @@ class IngestionService:
         new_docs_count = 0
         for f in tqdm(files_to_process, desc="Ingestion des fichiers", unit="file"):
             try:
-                for doc in dispatch_loader(f):
+                for doc in dispatch_loader(f, valid_labels=valid_labels):
                     process_document(doc, valid_labels)
                     new_docs_count += 1
             except Exception as e:
