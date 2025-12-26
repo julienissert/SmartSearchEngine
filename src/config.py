@@ -20,3 +20,16 @@ TARGET_DOMAINS = ["food", "medical"]
 SEARCH_LARGE_K = 100       # Profondeur d'exploration pour trouver le texte
 CONSENSUS_THRESHOLD = 15   # Nombre de voisins pour voter le label
 MAX_CONFIRMATION_IMAGES = 3 # Nombre d'images de preuve à garder
+
+#config label_detector.py
+# --- SEUILS D'INTELLIGENCE & DÉTECTION ---
+# Confiance minimale pour CLIP (Couche 2)
+SEMANTIC_THRESHOLD = 0.65 
+
+# Paramètres statistiques (Couche 3)
+LABEL_MIN_LENGTH = 3
+LABEL_MAX_LENGTH = 50
+ENABLE_STATISTICAL_FALLBACK = True # Toujours True par défaut selon ton choix
+
+# Limites de performance
+MAX_CLIP_CANDIDATES = 500

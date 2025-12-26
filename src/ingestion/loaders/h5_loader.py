@@ -1,4 +1,4 @@
-# ingestion/loaders/h5_loader.py
+# src/ingestion/loaders/h5_loader.py
 import h5py
 from ingestion.loaders.base_loader import BaseLoader
 
@@ -22,11 +22,15 @@ class H5Loader(BaseLoader):
                                 content_summary = str(node[()])
                             except:
                                 content_summary = "Non-text binary data"
+                        
+                        attrs = {k: str(v) for k, v in node.attrs.items()}
+                        suggested = attrs.get("label") or attrs.get("category") or attrs.get("class")
+                        
                         docs.append({
                             "source": path,
                             "type": "h5",
-                            "dataset": name,
-                            "content": content_summary
+                            "content": {name: content_summary},
+                            "suggested_label": suggested 
                         })
                 f.visititems(visit)
         except Exception:

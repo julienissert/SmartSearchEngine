@@ -13,26 +13,15 @@ class CSVLoader(BaseLoader):
         try:
             df = pd.read_csv(path)
             df.columns = [c.strip() for c in df.columns]
-        except Exception as e:
+        except Exception:
             return []
 
         docs = []
-        candidate_label_cols = ["Item", "Product", "Name", "Title", "Label"]
-
         for idx, row in df.iterrows():
-            row_dict = row.to_dict()
-            suggested_label = None
-            for col in candidate_label_cols:
-                if col in row_dict and row_dict[col]:
-                    val = str(row_dict[col]).strip()
-                    if len(val) > 2:
-                        suggested_label = val.lower()
-                        break 
-            
             docs.append({
                 "source": path,
                 "type": "csv",
-                "content": row_dict,
-                "suggested_label": suggested_label 
+                "content": row.to_dict(),
+                "suggested_label": None 
             })
         return docs
