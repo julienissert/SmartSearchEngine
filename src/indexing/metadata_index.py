@@ -15,7 +15,7 @@ def load_metadata_from_disk():
                 with open(config.METADATA_DIR / file, "r", encoding="utf-8") as f:
                     metadata_stores[domain] = json.load(f)
         total = sum(len(v) for v in metadata_stores.values())
-        print(f"📖 {total} documents chargés depuis {len(metadata_stores)} fichiers de métadonnées.")
+        print(f" {total} documents chargés depuis {len(metadata_stores)} fichiers de métadonnées.")
     else:
         metadata_stores = {}
         
