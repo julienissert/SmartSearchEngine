@@ -46,6 +46,6 @@ def add_to_index(domain, vector, doc_id):
     v = np.array([vector]).astype("float32")
     ids = np.array([doc_id]).astype("int64")
     
-    index.add_with_ids(v, ids)
+    index.add_with_ids(v, ids)  # type: ignore
     
     faiss.write_index(index, get_index_path(domain))
