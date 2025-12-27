@@ -27,15 +27,26 @@ class ResultComposer:
                 domain_data = self.metadata_by_domain.get(domain, [])
                 data = domain_data[doc_id]
                 
-                final_results.append({
+                # On prépare la base du résultat
+                res = {
                     "domain": domain,
                     "label": data.get("label"),
                     "source": data.get("source"),
-                    "domain_scores": data.get("domain_scores"), 
-                    "snippet": data.get("snippet"),
                     "match_score": m["score"],
                     "origin": m.get("origin", "unknown") 
-                })
+                }
+
+                # LOGIQUE D'AFFICHAGE ENRICHIE
+                # 1. Si on a des données CSV/H5 complètes, on les met dans 'details'
+                if data.get("raw_data"):
+                    res["details"] = data.get("raw_data")
+                # 2. Sinon, si on a un snippet texte (PDF/Image), on le met dans 'details'
+                elif data.get("snippet"):
+                    res["details"] = data.get("snippet")
+                # 3. Si rien du tout (médicament simple), 'details' n'apparaît pas
+                
+                final_results.append(res)
+
             except (IndexError, KeyError):
                 continue
         
