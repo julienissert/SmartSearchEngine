@@ -28,4 +28,5 @@ def check_environment():
     config.METADATA_DIR.mkdir(parents=True, exist_ok=True) 
     
     logger.info("Structure de l'application validée.")
+    logger.info(f"Matériel utilisé pour l'IA : {config.DEVICE}")
     return True

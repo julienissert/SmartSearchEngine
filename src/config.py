@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv  
-
+import torch
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env") 
 
@@ -33,3 +33,12 @@ ENABLE_STATISTICAL_FALLBACK = True # Toujours True par défaut selon ton choix
 
 # Limites de performance
 MAX_CLIP_CANDIDATES = 500
+
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+elif torch.backends.mps.is_available():
+    DEVICE = "mps" 
+else:
+    DEVICE = "cpu"
+    
+BATCH_SIZE = 32 # Nombre de documents traités simultanément CLIP

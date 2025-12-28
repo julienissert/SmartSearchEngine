@@ -4,8 +4,12 @@ import config
 from tqdm import tqdm  
 from ingestion.folder_scanner import scan_folder
 from ingestion.dispatcher import dispatch_loader
-from ingestion.core import process_document
-from indexing.faiss_index import reset_all_indexes
+from ingestion.core import process_batch 
+from indexing.faiss_index import (
+    reset_all_indexes, 
+    load_all_indexes, 
+    save_all_indexes  
+)
 from indexing.metadata_index import (
     save_metadata_to_disk, 
     clear_metadata, 
@@ -27,6 +31,7 @@ class IngestionService:
             return "Base réinitialisée"
         else:
             load_metadata_from_disk()
+            load_all_indexes()
             logger.info("Base de données chargée pour complétion.")
             return "Base chargée"
 
@@ -35,46 +40,39 @@ class IngestionService:
         if not os.path.exists(config.DATASET_DIR):
             logger.error(f"Dossier source introuvable : {config.DATASET_DIR}")
             raise FileNotFoundError(f"Dossier source introuvable : {config.DATASET_DIR}")
-
         all_files = scan_folder(config.DATASET_DIR)
-        
         if mode == 'c':
             processed_sources = {m['source'] for m in get_all_metadata()}
-            files = [f for f in all_files if f not in processed_sources]
-            logger.info(f"Mode complétion : {len(files)} nouveaux fichiers détectés sur {len(all_files)}.")
-            return files
-        
-        logger.info(f"Mode réinitialisation : {len(all_files)} fichiers à traiter.")
+            return [f for f in all_files if f not in processed_sources]
         return all_files
 
     @staticmethod
     def run_workflow(mode='r'):
-        """Exécute la logique complète d'ingestion avec suivi par barre de progression."""
-        logger.info("--- Démarrage d'un nouveau workflow d'ingestion ---")
-        
-        # 1. Préparation des index et métadonnées
+        """Workflow industriel avec traitement par lots et RAM-First indexing."""
+        logger.info("--- Démarrage du workflow d'ingestion (Mode Batch) ---")
         IngestionService.prepare_database(mode)
-        
-        # 2. Analyse de la structure pour valider les domaines (food, medical, etc.)
         valid_labels = analyze_dataset_structure(config.DATASET_DIR)
-        
-        # 3. Liste des fichiers à traiter
         files_to_process = IngestionService.get_files_to_ingest(mode)
         
-        # 4. Traitement avec barre de progression dynamique
         new_docs_count = 0
-        for f in tqdm(files_to_process, desc="Ingestion des fichiers", unit="file"):
+        
+        for f in tqdm(files_to_process, desc="Total Fichiers", unit="file"):
             try:
-                for doc in dispatch_loader(f, valid_labels=valid_labels):
-                    process_document(doc, valid_labels)
-                    new_docs_count += 1
+                docs = dispatch_loader(f, valid_labels=valid_labels)
+                
+                desc_intern = f" > {os.path.basename(f)[:20]}"
+                for i in range(0, len(docs), config.BATCH_SIZE):
+                    batch = docs[i : i + config.BATCH_SIZE]
+                    process_batch(batch, valid_labels)
+                    new_docs_count += len(batch)
+                    
             except Exception as e:
                 logger.error(f"Erreur critique sur le fichier {f} : {str(e)}")
                 continue 
 
-        # 5. Sauvegarde finale des métadonnées enrichies
         if new_docs_count > 0:
             save_metadata_to_disk()
+            save_all_indexes()
             logger.info(f"Sauvegarde réussie : {new_docs_count} nouveaux documents indexés.")
             
         return new_docs_count, len(files_to_process)

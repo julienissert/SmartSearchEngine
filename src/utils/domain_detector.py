@@ -15,6 +15,7 @@ PROMPT_TEMPLATES = [
 DOMAIN_VECTORS_AUDIT = {}
 DOMAIN_VECTORS_RAW = {}
 
+# Pré-calcul des vecteurs de référence au démarrage pour éviter de recalculer CLIP inutilement
 for domain in config.TARGET_DOMAINS:
     # Vecteurs pour l'IA (Audit) : avec phrases pour mieux comprendre les images
     prompts = [template.format(domain) for template in PROMPT_TEMPLATES]
@@ -35,23 +36,36 @@ def get_raw_similarity(word):
     emb = emb / norm
     return {d: float(np.dot(emb, v)) for d, v in DOMAIN_VECTORS_RAW.items()}
 
-def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str = None, content_dict: dict = None):
+def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str = None, 
+                  content_dict: dict = None, precomputed_vector: np.ndarray = None):
     """
-    Hiérarchie Pro : 
-    - Dossier (C0) & Structure (C1) utilisent des vecteurs bruts (Décision déterministe).
-    - L'Audit (Étape A) utilise des vecteurs templates (Analyse de contenu).
+    Détecteur de domaine optimisé pour le batching.
+    
+    Args:
+        text, pil_image: Données brutes (utilisées seulement si precomputed_vector est None).
+        filepath: Chemin pour la Couche 0 (Priorité dossier).
+        content_dict: Structure pour la Couche 1 (Priorité clés).
+        precomputed_vector: Le vecteur CLIP déjà calculé par le processus de batching.
     """
     
-    # --- ÉTAPE A : CALCUL SYSTÉMATIQUE DE L'AUDIT IA (Contenu brut) ---
+    # --- ÉTAPE A : RÉCUPÉRATION DU VECTEUR (Calcul ou Réutilisation) ---
     ai_probabilities = {d: 0.0 for d in config.TARGET_DOMAINS}
-    doc_emb = embed_image(pil_image) if pil_image else embed_text(text) if text else None
+    
+    # Si le batching nous donne déjà le vecteur, on gagne un temps précieux !
+    doc_emb = precomputed_vector
+    
+    # Fallback si appelé individuellement sans pré-calcul
+    if doc_emb is None:
+        doc_emb = embed_image(pil_image) if pil_image else embed_text(text) if text else None
     
     if doc_emb is not None:
         doc_norm = np.linalg.norm(doc_emb)
         if doc_norm > 0:
-            doc_emb = doc_emb / doc_norm
-            # On utilise l'IA (Audit) avec templates ici
-            raw_scores = {d: float(np.dot(doc_emb, v)) for d, v in DOMAIN_VECTORS_AUDIT.items()}
+            norm_vec = doc_emb / doc_norm
+            # Audit IA basé sur les templates
+            raw_scores = {d: float(np.dot(norm_vec, v)) for d, v in DOMAIN_VECTORS_AUDIT.items()}
+            
+            # Transformation en probabilités (Softmax)
             logits = np.array(list(raw_scores.values())) * 100.0
             exp_logits = np.exp(logits - np.max(logits))
             probs = exp_logits / np.sum(exp_logits)
@@ -59,7 +73,7 @@ def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str
 
     # --- ÉTAPE B : HIÉRARCHIE DES COUCHES DE DÉCISION ---
 
-    # COUCHE 0 : Contexte de Dossier par Segmentation
+    # COUCHE 0 : Contexte de Dossier (Segmentation du chemin)
     if filepath:
         try:
             rel_path = os.path.relpath(filepath, config.DATASET_DIR)
@@ -68,27 +82,22 @@ def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str
             
             for segment in segments:
                 if len(segment) < 2: continue
-                
-                # Comparaison directe Mot vs Domaine (sans templates pollueurs)
                 scores = get_raw_similarity(segment)
-                if scores:
-                    max_val = max(scores.values())
-                    if max_val > 0.85: 
-                        best_path = max(scores, key=lambda k: scores[k])
-                        return best_path, ai_probabilities, "path_forced"
+                if scores and max(scores.values()) > 0.85: 
+                    best_path = max(scores, key=lambda k: scores[k])
+                    return best_path, ai_probabilities, "path_forced"
         except Exception:
             pass
 
-    # COUCHE 1 : Signature de Structure (Clés/Colonnes)
+    # COUCHE 1 : Signature de Structure (Analyse des colonnes/clés)
     if isinstance(content_dict, dict):
         schema_text = " ".join(content_dict.keys())
-        # On teste les mots de la structure
         for word in schema_text.replace("_", " ").split():
             scores = get_raw_similarity(word)
             if scores and max(scores.values()) > 0.85:
                 best_schema = max(scores, key=lambda k: scores[k])
                 return best_schema, ai_probabilities, "schema_forced"
 
-    # COUCHE 2 : Fallback IA (Si aucun indice dans le dossier/structure)
+    # COUCHE 2 : Fallback IA (Audit de contenu sémantique)
     best_ai = max(ai_probabilities, key=lambda k: ai_probabilities[k])
     return best_ai, ai_probabilities, "ai_content"
