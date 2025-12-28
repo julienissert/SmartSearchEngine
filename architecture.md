@@ -4,6 +4,7 @@ L'ensemble du système est conçu selon le principe de **Séparation des Préocc
 
 ## Arborescence du Projet
 
+```text
 SmartSearchEngine/
 ├── raw-datasets/               # Données sources (Fichiers bruts à ingérer : CSV, PDF, Images, H5)
 ├── computed-data/              # Persistance des données générées par le pipeline
@@ -17,7 +18,7 @@ SmartSearchEngine/
     │
     ├── ingestion/              # --- MODULE INGESTION (CONSTRUCTION) ---
     │   ├── main.py             # Point d'entrée CLI local pour l'ingestion de données.
-    │   ├── service.py          # Gestionnaire de workflow : Gère l'orchestration et le **Batching**.
+    │   ├── service.py          # Gestionnaire de workflow : Gère l'orchestration et le Batching.
     │   ├── core.py             # Logique métier : Vectorisation groupée et classification finale.
     │   ├── dispatcher.py       # Routeur de fichiers : Associe chaque extension au loader adéquat.
     │   ├── folder_scanner.py   # Scan récursif intelligent du dossier source.
@@ -54,3 +55,5 @@ SmartSearchEngine/
         ├── preprocessing.py    # Nettoyage sémantique et normalisation du texte.
         ├── visualizer.py       # Générateur de nuages de points 3D (Plotly + PCA).
         └── logger.py           # Système de logs industriel avec rotation et compression Gzip.
+
+```
