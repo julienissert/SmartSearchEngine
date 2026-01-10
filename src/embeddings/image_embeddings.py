@@ -19,7 +19,7 @@ def embed_image(img: Image.Image):
 
 def embed_image_batch(images: list):
     if not images: return []
-    inputs = image_processor(images=images, return_tensors="pt", padding=True).to(config.DEVICE)
+    inputs = image_processor(images=images, return_tensors="pt").to(config.DEVICE)
     with torch.no_grad():
         features = model.get_image_features(**inputs)
     return features.cpu().numpy()
