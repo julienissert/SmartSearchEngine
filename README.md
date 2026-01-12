@@ -28,4 +28,4 @@ python src/main.py ingest
 ```bash
 python src/main.py serve
 ```
-Le serveur sera disponible sur http://localhost:8000. L'endpoint principal est /search
+Le serveur sera disponible sur http://localhost:8000/docs. L'endpoint principal est /search
