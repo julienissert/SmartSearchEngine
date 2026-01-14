@@ -212,7 +212,9 @@ marimo/_lsp/
 __marimo__/
 
 # Ignore datasets folder
+raw-datasets-01/*
 raw-datasets/*
+
 
 # Do not ignore the dataasets folder README.md
 !raw-datasets/README.md
@@ -238,3 +240,9 @@ logs/
 
 # --- Environnement ---
 .env
+
+# --- Perso ---
+# test_ocr_units.py
+# debuh-hard.py
+# export_code.py
+project_context.txt
