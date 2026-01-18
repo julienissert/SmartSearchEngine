@@ -22,10 +22,18 @@ L'ensemble du projet se pilote via l'orchestrateur unique à la racine du dossie
 
 1. Ingestion des données (Construction)
 ```bash
-python src/main.py ingest
+python src/ingestion/main.py --mode c (Pour complétion de données précédement compilées.)
+python src/ingestion/main.py --mode r (Pour effacement et reconstruction des données compilées.)
 ```
 2. Lancement du Serveur (Service API)
 ```bash
 python src/main.py serve
 ```
 Le serveur sera disponible sur http://localhost:8000. L'endpoint principal est /search
+
+3. Lancement du serveur d'ingestion (Watchdog)
+```bash
+python -m src.utils.watcher
+````
+Celui sert à lancer l'ingestion automatiquement dès l'ajout de nouveaux datasets dans le répertoire dédié.
+
