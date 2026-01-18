@@ -8,6 +8,7 @@ logger = setup_logger("SearchAPI")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(" L'API de recherche est prête et opérationnelle.")
+    logger.info(" Accédez à l'interface de test : http://localhost:8000/docs")
     yield
     logger.info(" Arrêt de l'API de recherche.")
 
