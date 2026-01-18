@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import torch
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env") 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 TEXT_MODEL_NAME = os.getenv("TEXT_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32")

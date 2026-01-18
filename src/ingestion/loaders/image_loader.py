@@ -10,9 +10,8 @@ _ocr_engine = None
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
-        # use_angle_cls=True pour gérer les rotations, lang='fr' pour le français
-        # show_log=False pour éviter de spammer la console avec 30 cœurs
-        _ocr_engine = PaddleOCR(use_angle_cls=True, lang='fr')
+        # Ajout de show_log=False pour désactiver les logs DEBUG de Paddle
+        _ocr_engine = PaddleOCR(use_angle_cls=True, lang='fr', show_log=False)
     return _ocr_engine
 
 class ImageLoader(BaseLoader):
