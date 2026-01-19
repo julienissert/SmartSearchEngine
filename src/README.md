@@ -64,6 +64,13 @@ Centralise les constantes du projet :
 Le script doit toujours être lancé depuis la **racine du projet** pour que les imports Python fonctionnent :
 ```bash
 
-python src/main.py
+python -m src.main [COMMAND]
 
 ```
+
+| Action            | Commande                          | Description                                                                 |
+|-------------------|-----------------------------------|-----------------------------------------------------------------------------|
+| Réinitialisation  | `python -m src.main ingest -m r`   | Efface les index existants et reconstruit tout à partir de zéro.            |
+| Complétion        | `python -m src.main ingest -m c`   | Ajoute uniquement les nouveaux fichiers détectés dans le dossier dataset sans effacer l'existant. |
+| Surveillance      | `python -m src.main watch`         | Lance le service Watcher qui automatise l'ingestion dès qu'un fichier est ajouté ou déplacé. |
+| Serveur API       | `python -m src.main serve`         | Démarre l'API FastAPI pour effectuer des recherches (disponible sur le port 8000). |

@@ -1,56 +1,56 @@
 # src/main.py
 import sys
-from src.utils.logger import setup_logger
 import argparse
 import uvicorn
 from pathlib import Path
+
+# --- CONFIGURATION DES CHEMINS ---
+# On récupère le chemin absolu du dossier 'src'
+SRC_DIR = Path(__file__).resolve().parent
+# On récupère le chemin de la racine du projet (au-dessus de 'src')
+ROOT_DIR = SRC_DIR.parent
+
+# On ajoute les DEUX dossiers au path pour supporter tous les styles d'imports
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# Maintenant, 'import config' ET 'from src import config' fonctionneront
 from utils.environment import check_environment
 from utils.logger import setup_logger
 
-SRC_DIR = Path(__file__).resolve().parent
-if str(SRC_DIR) not in sys.path:
-    sys.path.append(str(SRC_DIR))
-
-
 logger = setup_logger("Orchestrator")
 
-def get_ingestion_service():
-    from src.ingestion.service import IngestionService
-    return IngestionService()
-
 def main():
-    # --- 1. PRE-FLIGHT CHECK ---
-    check_environment()
+    check_environment() #
 
-    # --- 2. GESTION DU CLI ---
     parser = argparse.ArgumentParser(description="SmartSearchEngine CLI")
-    parser.add_argument(
-        "mode", 
-        choices=["ingest", "serve"], 
-        help="Lancer l'ingestion (ingest) ou le serveur API (serve)"
-    )
+    subparsers = parser.add_subparsers(dest="command", help="Commandes")
 
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)
+    # Ingest
+    ingest_parser = subparsers.add_parser("ingest", help="Lancer l'ingestion")
+    ingest_parser.add_argument("-m", "--mode", choices=['r', 'c'], help="r: reset, c: compléter")
+
+    # Serve
+    subparsers.add_parser("serve", help="Lancer l'API")
+
+    # Watch
+    subparsers.add_parser("watch", help="Lancer le Watcher")
 
     args = parser.parse_args()
 
-    # --- 3. EXÉCUTION DU MODE ---
-    if args.mode == "ingest":
-        logger.info("Mode : Ingestion des données")
-        from ingestion.main import main as run_ingestion
-        run_ingestion()
-
-    elif args.mode == "serve":
-        logger.info(" Mode : Lancement du serveur Search API")
-        
-        uvicorn.run(
-            "search.main:app", 
-            host="0.0.0.0", 
-            port=8000, 
-            reload=True
-        )
+    if args.command == "ingest":
+        from ingestion.main import run_ingestion_logic
+        run_ingestion_logic(mode=args.mode)
+    elif args.command == "serve":
+        logger.info("Lancement Search API")
+        uvicorn.run("search.main:app", host="0.0.0.0", port=8000, reload=True)
+    elif args.command == "watch":
+        from utils.watcher import start_watching
+        start_watching()
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
     main()
