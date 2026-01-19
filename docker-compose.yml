@@ -2,14 +2,16 @@ services:
   # SERVICE 1 : Ingestion automatique
   ingest:
     build: .
-    container_name: engine_ingest
+    image: smartsearchengine-base:latest  # Définit l'image unique
+    container_name: ingest                # Renommé selon votre demande
     environment:
       - OCR_LANG=latin
+      # Note : DEVICE_OVERRIDE=cpu peut être ajouté ici pour forcer la stabilité
     volumes:
       - ./raw-datasets:/app/raw-datasets
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
-    command: ["ingest"]
+    command: ["ingest"] # Déclenche la fonction run_ingestion() dans main.py
     deploy:
       resources:
         reservations:
@@ -19,15 +21,15 @@ services:
               capabilities: [gpu]
 
   # SERVICE 2 : API de Recherche
-  serve:
-    build: .
-    container_name: engine_api
+  search:                                 # Nom du service mis à jour
+    image: smartsearchengine-base:latest  # Réutilise l'image déjà construite
+    container_name: search                # Renommé selon votre demande
     ports:
       - "8000:8000"
     volumes:
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
-    command: ["serve"]
+    command: ["serve"] # Lance le serveur FastAPI via uvicorn
     restart: unless-stopped
     depends_on:
       - ingest
