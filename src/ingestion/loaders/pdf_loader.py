@@ -1,5 +1,5 @@
-# ingestion/loaders/pdf_loader.py
-import PyPDF2
+# src/ingestion/loaders/pdf_loader.py
+import fitz  
 from ingestion.loaders.base_loader import BaseLoader
 
 class PDFLoader(BaseLoader):
@@ -12,10 +12,10 @@ class PDFLoader(BaseLoader):
     def load(self, path: str, valid_labels=None) -> list:
         text = ""
         try:
-            with open(path, "rb") as f:
-                reader = PyPDF2.PdfReader(f)
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
+            with fitz.open(path) as doc:
+                for page in doc:
+                    text += page.get_text() + "\n"
+            
             return [{
                 "source": path,
                 "type": "pdf",

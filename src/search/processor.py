@@ -4,15 +4,15 @@ from PIL import Image
 from paddleocr import PaddleOCR
 from embeddings.image_embeddings import embed_image
 from utils.logger import setup_logger
-
+import config
 logger = setup_logger("Processor")
 
 # --- Initialisation de PaddleOCR (Singleton) ---
 # use_angle_cls=True : permet de détecter le texte même si l'image est tournée
 # lang='fr' : charge le modèle français (qui gère très bien l'anglais aussi)
 try:
-    logger.info("Chargement du modèle PaddleOCR...")
-    ocr_engine = PaddleOCR(use_angle_cls=True, lang='fr', show_log=False)
+    logger.info(f"Chargement du modèle PaddleOCR (Langue: {config.OCR_LANG})...")
+    ocr_engine = PaddleOCR(use_angle_cls=True, lang=config.OCR_LANG, show_log=False)
     logger.info("PaddleOCR chargé avec succès.")
 except Exception as e:
     logger.error(f"Erreur lors du chargement de PaddleOCR : {e}")

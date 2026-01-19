@@ -43,7 +43,7 @@ def main():
         
         uvicorn.run(
             "search.main:app", 
-            host="localhost", 
+            host="0.0.0.0", 
             port=8000, 
             reload=True
         )

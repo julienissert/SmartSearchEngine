@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 from paddleocr import PaddleOCR
 from ingestion.loaders.base_loader import BaseLoader
+import config
 
 # Instance globale pour le processus en cours (évite de recharger le modèle à chaque fichier)
 _ocr_engine = None
@@ -10,8 +11,8 @@ _ocr_engine = None
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
-        # Ajout de show_log=False pour désactiver les logs DEBUG de Paddle
-        _ocr_engine = PaddleOCR(use_angle_cls=True, lang='fr', show_log=False)
+        # On utilise config.OCR_LANG au lieu de 'fr'
+        _ocr_engine = PaddleOCR(use_angle_cls=True, lang=config.OCR_LANG, show_log=False)
     return _ocr_engine
 
 class ImageLoader(BaseLoader):

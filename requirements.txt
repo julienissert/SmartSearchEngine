@@ -1,27 +1,23 @@
 # --- CORE IA & CALCUL TENSORIEL ---
-# Mise à jour vers 2.2.1 car Python 3.12 ne supporte pas la 2.1.2
 torch==2.2.1
 torchvision==0.17.1
-
-# Transformers : Pour CLIP et le Tokenizer
 transformers==4.38.0
 
 # --- OCR & VISION ---
-# Version CPU pour votre test local (vu votre log "IA : cpu")
+# Note : Si vous utilisez le GPU du Dockerfile, préférez 'paddlepaddle-gpu==2.6.2'
 paddlepaddle==2.6.2
 paddleocr==2.8.1
-# OpenCV et Pillow pour l'image
 opencv-python-headless==4.9.0.80
 Pillow==10.2.0
 
 # --- DATA & FORMATS ---
 pandas==2.2.0
 numpy==1.26.3
-PyPDF2==3.0.1
 h5py==3.10.0
+pymupdf>=1.23.0
 
 # --- VECTOR SEARCH ---
-# Version CPU pour le test local
+# Note : 'faiss-gpu' est préférable si vous utilisez la base NVIDIA du Dockerfile
 faiss-cpu==1.8.0
 
 # --- VISUALISATION & API ---
@@ -34,5 +30,5 @@ python-multipart==0.0.9
 # --- UTILITAIRES ---
 python-dotenv==1.0.0
 tqdm==4.66.1
-setuptools>=65.0.0
 psutil==6.1.0
+setuptools>=68.0.0

@@ -73755,5 +73755,140 @@
         "domain_score": 0.9907,
         "snippet": "",
         "id": 4521
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\20540.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9962,
+        "snippet": "",
+        "id": 4522
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\21065.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9942,
+        "snippet": "",
+        "id": 4523
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\21471.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9816,
+        "snippet": "",
+        "id": 4524
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\24595.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9973,
+        "snippet": "",
+        "id": 4525
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\2592.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9905,
+        "snippet": "",
+        "id": 4526
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\2858.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9964,
+        "snippet": "",
+        "id": 4527
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\2998.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9989,
+        "snippet": "",
+        "id": 4528
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\31526.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.994,
+        "snippet": "",
+        "id": 4529
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\33643.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9898,
+        "snippet": "",
+        "id": 4530
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\35861.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9849,
+        "snippet": "",
+        "id": 4531
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\37299.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9774,
+        "snippet": "",
+        "id": 4532
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\44926.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9956,
+        "snippet": "",
+        "id": 4533
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\7508.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9965,
+        "snippet": "",
+        "id": 4534
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\8880.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.997,
+        "snippet": "",
+        "id": 4535
+    },
+    {
+        "source": "C:\\Users\\karl5\\Documents\\5A\\projet5A\\SmartSearchEngine\\raw-datasets\\food-101\\food-101\\images\\gnocchi\\8963.jpg",
+        "type": "image",
+        "domain": "food",
+        "label": "gnocchi",
+        "domain_score": 0.9676,
+        "snippet": "",
+        "id": 4536
     }
 ]

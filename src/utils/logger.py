@@ -40,6 +40,7 @@ def setup_logger(name, log_file="ingestion.log", level=logging.INFO):
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    logger.propagate = False
     
     if not logger.handlers:
         logger.addHandler(console_handler)

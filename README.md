@@ -6,8 +6,8 @@ Moteur de recherche intelligent capable de classifier et de retrouver des inform
 
 Le système sépare strictement les données brutes, les artefacts calculés et la logique métier :
 
-* **`raw-datasets-01/`** : Données sources (CSV, PDF, Images, TXT, H5).
-* **`computed-data-03/`** : Fichiers générés (Index FAISS et base JSON).
+* **`raw-datasets/`** : Données sources (CSV, PDF, Images, TXT, H5).
+* **`computed-data/`** : Fichiers générés (Index FAISS et base JSON).
     * **`indexes/`** : Contient les fichiers `.index` par domaine.
     * **`metadata_db.json`** : Base de données textuelle complète synchronisée.
 * **`src/`** : Dossier racine du code source.
@@ -28,4 +28,4 @@ python src/main.py ingest
 ```bash
 python src/main.py serve
 ```
-Le serveur sera disponible sur http://localhost:8000. L'endpoint principal est /search
+Le serveur sera disponible sur http://localhost:8000/docs. 

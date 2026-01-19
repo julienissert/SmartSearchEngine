@@ -1,0 +1,40 @@
+services:
+  # SERVICE 1 : Ingestion automatique
+  ingest:
+    build: .
+    container_name: engine_ingest
+    environment:
+      - OCR_LANG=latin
+    volumes:
+      - ./raw-datasets:/app/raw-datasets
+      - ./computed-data:/app/computed-data
+      - ./logs:/app/logs
+    command: ["ingest"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # SERVICE 2 : API de Recherche
+  serve:
+    build: .
+    container_name: engine_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./computed-data:/app/computed-data
+      - ./logs:/app/logs
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      - ingest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
