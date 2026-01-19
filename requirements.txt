@@ -31,4 +31,6 @@ python-multipart==0.0.9
 python-dotenv==1.0.0
 tqdm==4.66.1
 psutil==6.1.0
+
+watchdog==4.0.0
 setuptools>=68.0.0

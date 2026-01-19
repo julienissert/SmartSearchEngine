@@ -1,5 +1,6 @@
 # src/main.py
 import sys
+from src.utils.logger import setup_logger
 import argparse
 import uvicorn
 from pathlib import Path
@@ -11,8 +12,11 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 
-
 logger = setup_logger("Orchestrator")
+
+def get_ingestion_service():
+    from src.ingestion.service import IngestionService
+    return IngestionService()
 
 def main():
     # --- 1. PRE-FLIGHT CHECK ---
