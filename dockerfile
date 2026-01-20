@@ -34,7 +34,7 @@ COPY .env .
 RUN mkdir -p raw-datasets computed-data/indexes computed-data/metadata logs
 
 # Configuration du PYTHONPATH [cite: 27]
-ENV PYTHONPATH=/app/src
+ENV PYTHONPATH=/app
 
 # Désactivation du pre-download pendant le build pour éviter le Segfault sur Mac
 # Les modèles seront téléchargés au premier RUN du conteneur

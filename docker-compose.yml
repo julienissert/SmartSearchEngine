@@ -15,13 +15,13 @@ services:
       - ./logs:/app/logs
       - ./model_cache:/root/.cache/huggingface
       - ./paddle_cache:/root/.paddleocr
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   # SERVICE 2 : Surveillance Automatique (Watchdog)
   watcher:
@@ -58,10 +58,10 @@ services:
       - ./model_cache:/root/.cache/huggingface
       - ./paddle_cache:/root/.paddleocr
     command: ["serve"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
