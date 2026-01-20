@@ -246,3 +246,6 @@ logs/
 # debuh-hard.py
 # export_code.py
 project_context.txt
+
+# Ignorer les données générées (Index et Métadonnées)
+computed-data/
