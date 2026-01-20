@@ -16,13 +16,13 @@ from indexing.metadata_index import (
 from utils.label_detector import analyze_dataset_structure
 from utils.logger import setup_logger
 
-# Initialisation du logger
 logger = setup_logger("IngestionService")
 
 def _worker_load_file(args):
     """Fonction exécutée par les workers pour le parsing et l'OCR."""
     file_path, valid_labels = args
     try:
+        # L'OCR s'exécute ici dans les processus enfants
         return dispatch_loader(file_path, valid_labels=valid_labels)
     except Exception:
         return []
@@ -52,31 +52,28 @@ class IngestionService:
 
     @staticmethod
     def run_workflow(mode='r'):
-        # --- 1. DÉTECTION DES RESSOURCES (Feedback immédiat) ---
+        # --- 1. DÉTECTION DES RESSOURCES ---
         cpu_count = os.cpu_count() or 1
         available_ram_gb = psutil.virtual_memory().available / (1024**3)
+        
+        # Optimisation : 100k fichiers demandent un chunksize plus élevé pour réduire l'IPC overhead
+        CHUNK_SIZE = 50 
         
         env_workers = os.getenv("MAX_WORKERS")
         if env_workers:
             MAX_WORKERS = int(env_workers)
-            selection_mode = "Manuel (Variable d'environnement)"
+            selection_mode = "Manuel"
         else:
-            ram_limit = max(1, int(available_ram_gb // 3))
-            cpu_limit = max(1, cpu_count - 2)
-            if config.DEVICE == "cuda":
-                MAX_WORKERS = min(2, cpu_limit)
-                selection_mode = "Auto-Bridé (Sécurité GPU)"
-            else:
-                MAX_WORKERS = min(cpu_limit, ram_limit)
-                selection_mode = "Automatique (Optimisé CPU)"
+            # Sur 30 cœurs, on laisse de la place pour le processus principal (Vectorisation)
+            MAX_WORKERS = max(1, cpu_count - 4)
+            selection_mode = "Auto-Optimisé"
 
-        logger.info(f"--- Démarrage du workflow PARALLÈLE ---")
-        logger.info(f"Matériel utilisé : {config.DEVICE.upper()}")
-        logger.info(f"Ressources : {cpu_count} CPUs, {available_ram_gb:.1f} Go RAM disponible.")
-        logger.info(f"Workers actifs : {MAX_WORKERS} ({selection_mode}).")
+        logger.info(f"--- Démarrage du workflow STREAMING ---")
+        logger.info(f"Workers OCR : {MAX_WORKERS} | Chunksize : {CHUNK_SIZE}")
 
         # --- 2. PRÉPARATION ---
         IngestionService.prepare_database(mode)
+        # L'analyse est maintenant batchée (voir label_detector.py)
         valid_labels = analyze_dataset_structure(config.DATASET_DIR)
         files_to_process = IngestionService.get_files_to_ingest(mode)
         
@@ -84,47 +81,45 @@ class IngestionService:
         new_docs_count = 0
         current_batch = []
 
-        # --- 3. EXÉCUTION ---
+        # --- 3. EXÉCUTION EN STREAMING (CPU OCR + GPU/CPU Vectorisation) ---
         try:
-            # A. Parsing Parallèle (OCR)
             tasks = [(f, valid_labels) for f in files_to_process]
-            with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                results = list(tqdm(
-                    executor.map(_worker_load_file, tasks, chunksize=1), 
-                    total=total_files, 
-                    desc="Ingestion (OCR & Parsing)", 
-                    unit="file"
-                ))
-
-            # B. Vectorisation CLIP & Indexation (Séquentiel en RAM)
-            logger.info("Début de l'indexation. Appuyez sur Ctrl+C pour suspendre et décharger la RAM.")
             
-            for docs in tqdm(results, desc="Indexation", unit="doc"):
-                if not docs: continue
-                current_batch.extend(docs)
+            with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                # IMPORTANT : On itère DIRECTEMENT sur l'itérateur sans le transformer en liste
+                # Cela permet de traiter le fichier 1 pendant que le worker traite le fichier 10
+                progress_bar = tqdm(
+                    executor.map(_worker_load_file, tasks, chunksize=CHUNK_SIZE), 
+                    total=total_files, 
+                    desc="Workflow Multimodal (OCR -> CLIP -> FAISS)", 
+                    unit="file"
+                )
 
-                if len(current_batch) >= config.BATCH_SIZE:
-                    process_batch(current_batch, valid_labels)
-                    new_docs_count += len(current_batch)
-                    current_batch = [] 
+                for docs in progress_bar:
+                    if not docs: continue
+                    current_batch.extend(docs)
 
-            # Traitement du reliquat
+                    # Si le batch est prêt, on vectorise immédiatement
+                    if len(current_batch) >= config.BATCH_SIZE:
+                        process_batch(current_batch, valid_labels)
+                        new_docs_count += len(current_batch)
+                        current_batch = [] 
+                        progress_bar.set_postfix({"indexed": new_docs_count})
+
+            # Reliquat final
             if current_batch:
                 process_batch(current_batch, valid_labels)
                 new_docs_count += len(current_batch)
 
         except KeyboardInterrupt:
-            # Capturer le signal Ctrl+C
-            logger.warning("\nInterruption détectée (Ctrl+C). Finalisation de la sauvegarde...")
+            logger.warning("\nInterruption détectée. Sauvegarde des données déjà traitées...")
+        except Exception as e:
+            logger.error(f"Erreur critique : {e}", exc_info=True)
         
         finally:
-            # --- 4. SAUVEGARDE DE SÉCURITÉ (DÉCHARGEMENT SYSTÉMATIQUE) ---
             if new_docs_count > 0:
-                logger.info(f"Déchargement de la RAM : sauvegarde de {new_docs_count} nouveaux documents...")
                 save_metadata_to_disk()
                 save_all_indexes()     
-                logger.info("Données sécurisées avec succès.")
-            else:
-                logger.info("Aucune nouvelle donnée à sauvegarder.")
+                logger.info(f"Sauvegarde réussie : {new_docs_count} documents.")
             
         return new_docs_count, total_files
