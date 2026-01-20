@@ -74,3 +74,27 @@ python -m src.main [COMMAND]
 | Complétion        | `python -m src.main ingest -m c`   | Ajoute uniquement les nouveaux fichiers détectés dans le dossier dataset sans effacer l'existant. |
 | Surveillance      | `python -m src.main watch`         | Lance le service Watcher qui automatise l'ingestion dès qu'un fichier est ajouté ou déplacé. |
 | Serveur API       | `python -m src.main serve`         | Démarre l'API FastAPI pour effectuer des recherches (disponible sur le port 8000). |
+
+#### Réinitialisation Totale
+`docker compose run --rm ingest ingest -m r`
+Supprime tous les index FAISS et métadonnées JSON existants pour reconstruire la base à partir de zéro.
+
+#### Ingestion de Complétion
+`docker compose run --rm ingest ingest -m c`
+Scanne le dossier raw-datasets et n'indexe que les nouveaux fichiers détectés.
+
+#### Surveillance Active	
+`docker compose up -d watcher`
+Lance le service "Watcher" en arrière-plan. Il utilise Watchdog pour ingérer automatiquement tout fichier ajouté au dossier raw-datasets.
+
+#### Démarrage de l'API
+`docker compose up -d search`
+Démarre le serveur FastAPI pour traiter les requêtes de recherche multimodales sur le port 8000.
+
+#### Arrêt des Services
+`docker compose down`
+Arrête et supprime les conteneurs actifs (watcher, search) tout en préservant vos données indexées.
+
+#### Consultation des Logs
+`docker compose logs -f`
+Affiche en temps réel les journaux d'ingestion et de recherche.

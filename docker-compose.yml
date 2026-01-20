@@ -1,9 +1,10 @@
 services:
+  # SERVICE 1 : Moteur d'Ingestion (Mode Manuel pour Reset ou Complétion)
+  # Commande pour Reset : docker compose run --rm ingest ingest -m r
+  # Commande pour Complétion : docker compose run --rm ingest ingest -m c
   ingest:
-    build: .
-    image: votre_pseudo_dockerhub/smartsearchengine:latest
-    container_name: ingest
-    # Permet de répondre au prompt [R/C] dans le terminal 
+    image: julienisrt/smartsearchengine:latest
+    container_name: ingest_manual
     tty: true
     stdin_open: true
     environment:
@@ -12,8 +13,8 @@ services:
       - ./raw-datasets:/app/raw-datasets
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
-    command: ["ingest"]
-    # La section deploy est ignorée par Docker si aucun GPU n'est présent
+      - ./model_cache:/root/.cache/huggingface
+      - ./paddle_cache:/root/.paddleocr
     deploy:
       resources:
         reservations:
@@ -22,16 +23,45 @@ services:
               count: 1
               capabilities: [gpu]
 
+  # SERVICE 2 : Surveillance Automatique (Watchdog)
+  watcher:
+    image: julienisrt/smartsearchengine:latest
+    container_name: watcher
+    restart: unless-stopped
+    environment:
+      - OCR_LANG=latin
+    volumes:
+      - ./raw-datasets:/app/raw-datasets
+      - ./computed-data:/app/computed-data
+      - ./logs:/app/logs
+      - ./model_cache:/root/.cache/huggingface
+      - ./paddle_cache:/root/.paddleocr
+    command: ["watch"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # SERVICE 3 : API de Recherche
   search:
-    image: julienisrt/smart-search/smartsearchengine:latest
+    image: julienisrt/smartsearchengine:latest
     container_name: search
     ports:
       - "8000:8000"
+    restart: unless-stopped
     volumes:
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
+      - ./model_cache:/root/.cache/huggingface
+      - ./paddle_cache:/root/.paddleocr
     command: ["serve"]
-    restart: unless-stopped
-    depends_on:
-      ingest:
-        condition: service_completed_successfully # Attend la fin de l'ingestion
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
