@@ -1,78 +1,126 @@
-# src/utils/label_detector.py
+# src/ingestion/service.py
 import os
 import config
-from collections import Counter
+import concurrent.futures
+import psutil
 from tqdm import tqdm
-from embeddings.text_embeddings import embed_text_batch # Import de la version batchée
+from ingestion.folder_scanner import scan_folder
+from ingestion.dispatcher import dispatch_loader
+from ingestion.core import process_batch
+from indexing.faiss_index import (
+    reset_all_indexes, load_all_indexes, save_all_indexes
+)
+from indexing.metadata_index import (
+    save_metadata_to_disk, clear_metadata, load_metadata_from_disk, get_all_metadata
+)
+from utils.label_detector import analyze_dataset_structure
+from utils.logger import setup_logger
 
-def analyze_dataset_structure(dataset_path):
-    """
-    Analyse la structure du dataset et pré-calcule les vecteurs CLIP pour tous les labels.
-    Optimisé pour les volumes massifs (100k+ labels).
-    """
-    valid_labels = set()
-    leaf_folders = []
-    
-    print(f"🔍 Analyse structurelle du dataset : {dataset_path}")
+logger = setup_logger("IngestionService")
 
-    # --- 1. COLLECTE DES LABELS (Folders + TXT) ---
-    for root, dirs, files in os.walk(dataset_path):
-        # On enregistre les noms de dossiers qui contiennent des fichiers
-        if files: 
-            folder_name = os.path.basename(root).lower()
-            leaf_folders.append(folder_name)
-            valid_labels.add(folder_name)
-            
-        # Extraction des labels supplémentaires dans les fichiers .txt
-        for f in files:
-            if f.endswith(".txt"):
-                try:
-                    with open(os.path.join(root, f), "r", encoding="utf-8") as txt:
-                        # Filtrage par longueur pour éviter les bruits
-                        lines = [l.strip().lower() for l in txt.readlines() 
-                                 if config.LABEL_MIN_LENGTH <= len(l.strip()) <= config.LABEL_MAX_LENGTH]
-                        valid_labels.update(lines)
-                except Exception as e:
-                    pass
+# Seuil de sauvegarde pour éviter la saturation RAM (ex: tous les 5000 docs)
+SAVE_INTERVAL = 5000 
 
-    # --- 2. FILTRAGE STATISTIQUE (Couche 3) ---
-    # Élimine les dossiers techniques (images, meta, etc.) s'ils sont trop fréquents
-    blacklist = ["images", "img", "photos", "train", "test", "meta", "archive", "dataset"]
-    if leaf_folders and config.ENABLE_STATISTICAL_FALLBACK:
-        counts = Counter(leaf_folders)
-        total = len(leaf_folders)
-        for name, count in counts.items():
-            # Si un nom de dossier représente plus de 15% du dataset, c'est probablement structurel et non un label
-            if name.lower() in blacklist or (count/total > 0.15):
-                if name.lower() in valid_labels:
-                    valid_labels.remove(name.lower())
+def _worker_load_file(args):
+    file_path, valid_labels = args
+    try:
+        return dispatch_loader(file_path, valid_labels=valid_labels)
+    except Exception:
+        return []
 
-    # --- 3. VECTORISATION MASSIVE PAR BATCHS ---
-    labels_to_embed = sorted(list(valid_labels)) # Tri pour la cohérence
-    total_labels = len(labels_to_embed)
-    
-    if total_labels == 0:
-        return {}
+class IngestionService:
+    @staticmethod
+    def prepare_database(mode='r'):
+        if mode == 'r':
+            reset_all_indexes()
+            clear_metadata()
+            logger.info("Base de données réinitialisée (Reset mode).")
+        else:
+            load_metadata_from_disk()
+            load_all_indexes()
+            logger.info("Base de données chargée pour complétion.")
 
-    # On utilise LABEL_BATCH_SIZE (ex: 1000) pour ne pas saturer la RAM/VRAM
-    # Si non défini dans config.py, on utilise 1000 par défaut
-    batch_size = getattr(config, 'LABEL_BATCH_SIZE', 1000)
-    
-    print(f"🚀 Vectorisation de {total_labels} labels uniques (Batch Size: {batch_size})...")
-    
-    all_vectors = []
-    
-    # Barre de progression pour le suivi des 100k labels
-    for i in tqdm(range(0, total_labels, batch_size), desc="CLIP Label Encoding"):
-        batch = labels_to_embed[i : i + batch_size]
+    @staticmethod
+    def get_files_to_ingest(mode='r'):
+        if not os.path.exists(config.DATASET_DIR):
+            raise FileNotFoundError(f"Dossier source introuvable : {config.DATASET_DIR}")
         
-        # Appel massif au modèle CLIP
-        # Cette fonction doit retourner une liste de vecteurs (list of np.array)
-        batch_vectors = embed_text_batch(batch)
-        all_vectors.extend(batch_vectors)
+        all_files = scan_folder(config.DATASET_DIR)
+        if mode == 'c':
+            processed_sources = {m['source'] for m in get_all_metadata()}
+            return [f for f in all_files if f not in processed_sources]
+        return all_files
 
-    # Création du dictionnaire final : { "nom_label": vecteur_faiss }
-    label_mapping = dict(zip(labels_to_embed, all_vectors))
-    
-    print(f"✅ Apprentissage terminé. {len(label_mapping)} concepts enregistrés en mémoire.")
-    return label_mapping
+    @staticmethod
+    def run_workflow(mode='r'):
+        # --- 1. CONFIGURATION RESSOURCES ---
+        cpu_count = os.cpu_count() or 1
+        CHUNK_SIZE = 50 
+        MAX_WORKERS = max(1, cpu_count - 4)
+
+        logger.info(f"--- Démarrage du workflow HAUTE DISPONIBILITÉ ---")
+
+        # --- 2. PRÉPARATION ---
+        IngestionService.prepare_database(mode)
+        valid_labels = analyze_dataset_structure(config.DATASET_DIR)
+        files_to_process = IngestionService.get_files_to_ingest(mode)
+        
+        total_files = len(files_to_process)
+        new_docs_count = 0        # Total pour le rapport final
+        unsaved_docs_count = 0    # Compteur pour le prochain checkpoint
+        current_batch = []
+
+        # --- 3. EXÉCUTION STREAMING AVEC CHECKPOINTS ---
+        try:
+            tasks = [(f, valid_labels) for f in files_to_process]
+            
+            with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                # Itération streaming
+                progress_bar = tqdm(
+                    executor.map(_worker_load_file, tasks, chunksize=CHUNK_SIZE), 
+                    total=total_files, 
+                    desc="Ingestion Massive", 
+                    unit="file"
+                )
+
+                for docs in progress_bar:
+                    if not docs: continue
+                    current_batch.extend(docs)
+
+                    # A. Si le batch CLIP est plein, on vectorise
+                    if len(current_batch) >= config.BATCH_SIZE:
+                        batch_size = len(current_batch)
+                        process_batch(current_batch, valid_labels)
+                        
+                        new_docs_count += batch_size
+                        unsaved_docs_count += batch_size
+                        current_batch = [] 
+
+                        # B. STRATÉGIE ANTI-SATURATION : Sauvegarde périodique sur disque
+                        if unsaved_docs_count >= SAVE_INTERVAL:
+                            logger.info(f" Checkpoint : Sauvegarde de {unsaved_docs_count} docs sur disque...")
+                            save_metadata_to_disk()
+                            save_all_indexes()
+                            unsaved_docs_count = 0 # On remet à zéro après le flush
+                            
+                            # Log de la RAM pour monitoring
+                            ram_usage = psutil.virtual_memory().percent
+                            progress_bar.set_postfix({"RAM": f"{ram_usage}%", "Total": new_docs_count})
+
+            # Traitement du dernier batch restant
+            if current_batch:
+                process_batch(current_batch, valid_labels)
+                new_docs_count += len(current_batch)
+
+        except KeyboardInterrupt:
+            logger.warning("\nInterruption. Sauvegarde de sécurité...")
+        
+        finally:
+            # --- 4. FINALISATION ---
+            # On sauvegarde le reliquat qui n'a pas atteint le dernier SAVE_INTERVAL
+            if new_docs_count > 0:
+                save_metadata_to_disk()
+                save_all_indexes()     
+                logger.info(f"Workflow terminé. Total indexé : {new_docs_count} documents.")
+            
+        return new_docs_count, total_files
