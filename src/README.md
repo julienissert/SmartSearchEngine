@@ -61,6 +61,8 @@ Centralise les constantes du projet :
 ---
 
 ### Exécution
+
+#### Manuelle
 Le script doit toujours être lancé depuis la **racine du projet** pour que les imports Python fonctionnent :
 ```bash
 
@@ -74,3 +76,49 @@ python -m src.main [COMMAND]
 | Complétion        | `python -m src.main ingest -m c`   | Ajoute uniquement les nouveaux fichiers détectés dans le dossier dataset sans effacer l'existant. |
 | Surveillance      | `python -m src.main watch`         | Lance le service Watcher qui automatise l'ingestion dès qu'un fichier est ajouté ou déplacé. |
 | Serveur API       | `python -m src.main serve`         | Démarre l'API FastAPI pour effectuer des recherches (disponible sur le port 8000). |
+
+
+#### Via Docker 
+
+1. Préparation de l'espace de travail
+Avant de lancer Docker, vous devez créer l'arborescence locale sur votre machine pour que les volumes puissent être montés correctement. Ces dossiers correspondent aux chemins définis dans la configuration du projet.
+
+##### Créez le dossier du projet et déplacez-vous dedans
+
+```bash
+
+mkdir SmartSearchEngine && cd SmartSearchEngine
+
+```
+
+2. Ajout des données initiales (Datasets)
+Le service de surveillance (Watchdog) scanne récursivement le dossier raw-datasets pour détecter les fichiers compatibles (PDF, CSV, Image, etc.).
+
+
+- Action : Copiez vos dossiers de données (ex: dossiers "Food" ou "Medical") directement dans votre répertoire local ./raw-datasets.
+
+- Fonctionnement : Le folder_scanner.py identifiera ces fichiers grâce à leurs extensions et les enverra au dispatcher.py.
+
+##### Réinitialisation Totale
+`docker compose run --rm ingest ingest -m r`
+Supprime tous les index FAISS et métadonnées JSON existants pour reconstruire la base à partir de zéro.
+
+##### Ingestion de Complétion
+`docker compose run --rm ingest ingest -m c`
+Scanne le dossier raw-datasets et n'indexe que les nouveaux fichiers détectés.
+
+##### Surveillance Active	
+`docker compose up -d watcher`
+Lance le service "Watcher" en arrière-plan. Il utilise Watchdog pour ingérer automatiquement tout fichier ajouté au dossier raw-datasets.
+
+##### Démarrage de l'API
+`docker compose up -d search`
+Démarre le serveur FastAPI pour traiter les requêtes de recherche multimodales sur le port 8000.
+
+##### Arrêt des Services
+`docker compose down`
+Arrête et supprime les conteneurs actifs (watcher, search) tout en préservant vos données indexées.
+
+##### Consultation des Logs
+`docker compose logs -f`
+Affiche en temps réel les journaux d'ingestion et de recherche.
