@@ -1,17 +1,19 @@
 services:
-  # SERVICE 1 : Ingestion automatique
   ingest:
     build: .
-    image: smartsearchengine-base:latest  # Définit l'image unique
-    container_name: ingest                # Renommé selon votre demande
+    image: votre_pseudo_dockerhub/smartsearchengine:latest
+    container_name: ingest
+    # Permet de répondre au prompt [R/C] dans le terminal 
+    tty: true
+    stdin_open: true
     environment:
       - OCR_LANG=latin
-      # Note : DEVICE_OVERRIDE=cpu peut être ajouté ici pour forcer la stabilité
     volumes:
       - ./raw-datasets:/app/raw-datasets
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
-    command: ["ingest"] # Déclenche la fonction run_ingestion() dans main.py
+    command: ["ingest"]
+    # La section deploy est ignorée par Docker si aucun GPU n'est présent
     deploy:
       resources:
         reservations:
@@ -20,23 +22,16 @@ services:
               count: 1
               capabilities: [gpu]
 
-  # SERVICE 2 : API de Recherche
-  search:                                 # Nom du service mis à jour
-    image: smartsearchengine-base:latest  # Réutilise l'image déjà construite
-    container_name: search                # Renommé selon votre demande
+  search:
+    image: julienisrt/smart-search/smartsearchengine:latest
+    container_name: search
     ports:
       - "8000:8000"
     volumes:
       - ./computed-data:/app/computed-data
       - ./logs:/app/logs
-    command: ["serve"] # Lance le serveur FastAPI via uvicorn
+    command: ["serve"]
     restart: unless-stopped
     depends_on:
-      - ingest
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      ingest:
+        condition: service_completed_successfully # Attend la fin de l'ingestion

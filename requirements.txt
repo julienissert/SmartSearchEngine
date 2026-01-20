@@ -13,7 +13,7 @@ Pillow==10.2.0
 # --- DATA & FORMATS ---
 pandas==2.2.0
 numpy==1.26.3
-h5py==3.10.0
+h5py>=3.10.0
 pymupdf>=1.23.0
 
 # --- VECTOR SEARCH ---
