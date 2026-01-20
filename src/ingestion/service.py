@@ -1,125 +1,78 @@
-# src/ingestion/service.py
+# src/utils/label_detector.py
 import os
 import config
-import concurrent.futures
-import psutil
+from collections import Counter
 from tqdm import tqdm
-from ingestion.folder_scanner import scan_folder
-from ingestion.dispatcher import dispatch_loader
-from ingestion.core import process_batch
-from indexing.faiss_index import (
-    reset_all_indexes, load_all_indexes, save_all_indexes
-)
-from indexing.metadata_index import (
-    save_metadata_to_disk, clear_metadata, load_metadata_from_disk, get_all_metadata
-)
-from utils.label_detector import analyze_dataset_structure
-from utils.logger import setup_logger
+from embeddings.text_embeddings import embed_text_batch # Import de la version batchée
 
-logger = setup_logger("IngestionService")
+def analyze_dataset_structure(dataset_path):
+    """
+    Analyse la structure du dataset et pré-calcule les vecteurs CLIP pour tous les labels.
+    Optimisé pour les volumes massifs (100k+ labels).
+    """
+    valid_labels = set()
+    leaf_folders = []
+    
+    print(f"🔍 Analyse structurelle du dataset : {dataset_path}")
 
-def _worker_load_file(args):
-    """Fonction exécutée par les workers pour le parsing et l'OCR."""
-    file_path, valid_labels = args
-    try:
-        # L'OCR s'exécute ici dans les processus enfants
-        return dispatch_loader(file_path, valid_labels=valid_labels)
-    except Exception:
-        return []
-
-class IngestionService:
-    @staticmethod
-    def prepare_database(mode='r'):
-        if mode == 'r':
-            reset_all_indexes()
-            clear_metadata()
-            logger.info("Base de données réinitialisée (Reset mode).")
-        else:
-            load_metadata_from_disk()
-            load_all_indexes()
-            logger.info("Base de données chargée pour complétion.")
-
-    @staticmethod
-    def get_files_to_ingest(mode='r'):
-        if not os.path.exists(config.DATASET_DIR):
-            raise FileNotFoundError(f"Dossier source introuvable : {config.DATASET_DIR}")
-        
-        all_files = scan_folder(config.DATASET_DIR)
-        if mode == 'c':
-            processed_sources = {m['source'] for m in get_all_metadata()}
-            return [f for f in all_files if f not in processed_sources]
-        return all_files
-
-    @staticmethod
-    def run_workflow(mode='r'):
-        # --- 1. DÉTECTION DES RESSOURCES ---
-        cpu_count = os.cpu_count() or 1
-        available_ram_gb = psutil.virtual_memory().available / (1024**3)
-        
-        # Optimisation : 100k fichiers demandent un chunksize plus élevé pour réduire l'IPC overhead
-        CHUNK_SIZE = 50 
-        
-        env_workers = os.getenv("MAX_WORKERS")
-        if env_workers:
-            MAX_WORKERS = int(env_workers)
-            selection_mode = "Manuel"
-        else:
-            # Sur 30 cœurs, on laisse de la place pour le processus principal (Vectorisation)
-            MAX_WORKERS = max(1, cpu_count - 4)
-            selection_mode = "Auto-Optimisé"
-
-        logger.info(f"--- Démarrage du workflow STREAMING ---")
-        logger.info(f"Workers OCR : {MAX_WORKERS} | Chunksize : {CHUNK_SIZE}")
-
-        # --- 2. PRÉPARATION ---
-        IngestionService.prepare_database(mode)
-        # L'analyse est maintenant batchée (voir label_detector.py)
-        valid_labels = analyze_dataset_structure(config.DATASET_DIR)
-        files_to_process = IngestionService.get_files_to_ingest(mode)
-        
-        total_files = len(files_to_process)
-        new_docs_count = 0
-        current_batch = []
-
-        # --- 3. EXÉCUTION EN STREAMING (CPU OCR + GPU/CPU Vectorisation) ---
-        try:
-            tasks = [(f, valid_labels) for f in files_to_process]
+    # --- 1. COLLECTE DES LABELS (Folders + TXT) ---
+    for root, dirs, files in os.walk(dataset_path):
+        # On enregistre les noms de dossiers qui contiennent des fichiers
+        if files: 
+            folder_name = os.path.basename(root).lower()
+            leaf_folders.append(folder_name)
+            valid_labels.add(folder_name)
             
-            with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                # IMPORTANT : On itère DIRECTEMENT sur l'itérateur sans le transformer en liste
-                # Cela permet de traiter le fichier 1 pendant que le worker traite le fichier 10
-                progress_bar = tqdm(
-                    executor.map(_worker_load_file, tasks, chunksize=CHUNK_SIZE), 
-                    total=total_files, 
-                    desc="Workflow Multimodal (OCR -> CLIP -> FAISS)", 
-                    unit="file"
-                )
+        # Extraction des labels supplémentaires dans les fichiers .txt
+        for f in files:
+            if f.endswith(".txt"):
+                try:
+                    with open(os.path.join(root, f), "r", encoding="utf-8") as txt:
+                        # Filtrage par longueur pour éviter les bruits
+                        lines = [l.strip().lower() for l in txt.readlines() 
+                                 if config.LABEL_MIN_LENGTH <= len(l.strip()) <= config.LABEL_MAX_LENGTH]
+                        valid_labels.update(lines)
+                except Exception as e:
+                    pass
 
-                for docs in progress_bar:
-                    if not docs: continue
-                    current_batch.extend(docs)
+    # --- 2. FILTRAGE STATISTIQUE (Couche 3) ---
+    # Élimine les dossiers techniques (images, meta, etc.) s'ils sont trop fréquents
+    blacklist = ["images", "img", "photos", "train", "test", "meta", "archive", "dataset"]
+    if leaf_folders and config.ENABLE_STATISTICAL_FALLBACK:
+        counts = Counter(leaf_folders)
+        total = len(leaf_folders)
+        for name, count in counts.items():
+            # Si un nom de dossier représente plus de 15% du dataset, c'est probablement structurel et non un label
+            if name.lower() in blacklist or (count/total > 0.15):
+                if name.lower() in valid_labels:
+                    valid_labels.remove(name.lower())
 
-                    # Si le batch est prêt, on vectorise immédiatement
-                    if len(current_batch) >= config.BATCH_SIZE:
-                        process_batch(current_batch, valid_labels)
-                        new_docs_count += len(current_batch)
-                        current_batch = [] 
-                        progress_bar.set_postfix({"indexed": new_docs_count})
+    # --- 3. VECTORISATION MASSIVE PAR BATCHS ---
+    labels_to_embed = sorted(list(valid_labels)) # Tri pour la cohérence
+    total_labels = len(labels_to_embed)
+    
+    if total_labels == 0:
+        return {}
 
-            # Reliquat final
-            if current_batch:
-                process_batch(current_batch, valid_labels)
-                new_docs_count += len(current_batch)
-
-        except KeyboardInterrupt:
-            logger.warning("\nInterruption détectée. Sauvegarde des données déjà traitées...")
-        except Exception as e:
-            logger.error(f"Erreur critique : {e}", exc_info=True)
+    # On utilise LABEL_BATCH_SIZE (ex: 1000) pour ne pas saturer la RAM/VRAM
+    # Si non défini dans config.py, on utilise 1000 par défaut
+    batch_size = getattr(config, 'LABEL_BATCH_SIZE', 1000)
+    
+    print(f"🚀 Vectorisation de {total_labels} labels uniques (Batch Size: {batch_size})...")
+    
+    all_vectors = []
+    
+    # Barre de progression pour le suivi des 100k labels
+    for i in tqdm(range(0, total_labels, batch_size), desc="CLIP Label Encoding"):
+        batch = labels_to_embed[i : i + batch_size]
         
-        finally:
-            if new_docs_count > 0:
-                save_metadata_to_disk()
-                save_all_indexes()     
-                logger.info(f"Sauvegarde réussie : {new_docs_count} documents.")
-            
-        return new_docs_count, total_files
+        # Appel massif au modèle CLIP
+        # Cette fonction doit retourner une liste de vecteurs (list of np.array)
+        batch_vectors = embed_text_batch(batch)
+        all_vectors.extend(batch_vectors)
+
+    # Création du dictionnaire final : { "nom_label": vecteur_faiss }
+    label_mapping = dict(zip(labels_to_embed, all_vectors))
+    
+    print(f"✅ Apprentissage terminé. {len(label_mapping)} concepts enregistrés en mémoire.")
+    return label_mapping

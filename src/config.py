@@ -54,5 +54,6 @@ def get_optimal_device():
     return "cpu"
 
 DEVICE = get_optimal_device()
-BATCH_SIZE = 32 # Nombre de documents traités simultanément par CLIP
+BATCH_SIZE = 512
+LABEL_BATCH_SIZE = 1000
 OCR_LANG = os.getenv("OCR_LANG", "latin")
