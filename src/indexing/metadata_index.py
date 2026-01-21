@@ -129,3 +129,33 @@ def clear_metadata():
          shutil.rmtree(config.METADATA_DIR, ignore_errors=True)
          
     init_db()
+    
+def get_metadata_by_label(label, domain=None, limit=10):
+    """
+    Recherche transversale : récupère tous les documents liés à un label.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = "SELECT * FROM metadata WHERE label = ?"
+    params = [label]
+    
+    if domain:
+        query += " AND domain = ?"
+        params.append(domain)
+        
+    query += " LIMIT ?"
+    params.append(limit)
+    
+    try:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        results = []
+        for row in rows:
+            data = dict(row)
+            if data["raw_data"]:
+                data["raw_data"] = json.loads(data["raw_data"])
+            results.append(data)
+        return results
+    finally:
+        conn.close()   
