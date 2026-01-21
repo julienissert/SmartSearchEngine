@@ -6,25 +6,26 @@ from ingestion.loaders.image_loader import ImageLoader
 from ingestion.loaders.h5_loader import H5Loader
 from ingestion.loaders.txt_loader import TXTLoader
 
-# Enregistrement manuel des plugins
-LOADERS = [
-    CSVLoader(),
-    PDFLoader(),
-    ImageLoader(),
-    H5Loader(),
-    TXTLoader()
-]
+# 1. Mapping direct Extension -> Classe 
+LOADER_MAPPING = {
+    '.csv': CSVLoader, '.pdf': PDFLoader, '.h5': H5Loader, '.txt': TXTLoader,
+    '.jpg': ImageLoader, '.jpeg': ImageLoader, '.png': ImageLoader, '.webp': ImageLoader
+}
+
+# 2. Cache d'instances 
+LOADER_CACHE = {}
 
 def get_supported_extensions():
-    """Source de vérité unique pour les extensions gérées."""
-    extensions = []
-    for loader in LOADERS:
-        extensions.extend(loader.get_supported_extensions())
-    return list(set(extensions))
+    return list(LOADER_MAPPING.keys())
 
 def dispatch_loader(path: str, valid_labels=None):
     ext = os.path.splitext(path)[1].lower()
-    for loader in LOADERS:
-        if loader.can_handle(ext):
-            return loader.load(path, valid_labels=valid_labels)
-    raise ValueError(f"Aucun loader disponible pour l'extension {ext}")
+    loader_class = LOADER_MAPPING.get(ext)
+    
+    if not loader_class:
+        raise ValueError(f"Aucun loader disponible pour l'extension {ext}")
+
+    if loader_class not in LOADER_CACHE:
+        LOADER_CACHE[loader_class] = loader_class()
+    
+    return LOADER_CACHE[loader_class].load(path, valid_labels=valid_labels)

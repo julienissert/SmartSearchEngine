@@ -46,40 +46,47 @@ def init_db():
 def load_metadata_from_disk():
     init_db()
 
-def store_metadata(entry, domain):
-    """
-    Enregistre les métadonnées en base SQLite.
-    Optimisé pour l'ingestion massive : pas de init_db répétitif.
-    """
+def store_metadata_batch(entries_with_domains):
+    if not entries_with_domains:
+        return []
+
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM metadata WHERE domain = ?", (domain,))
-    local_id = cursor.fetchone()[0]
-    raw_data_str = json.dumps(entry["raw_data"], ensure_ascii=False) if entry.get("raw_data") else None
+    ids_mapping = []
+    domain_counts = {}
 
     try:
-        cursor.execute('''
-            INSERT INTO metadata (
-                local_id, domain, source, file_hash, type, 
-                label, domain_score, raw_data, snippet
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            local_id,
-            domain,
-            entry.get("source", ""),
-            entry.get("file_hash", ""), 
-            entry.get("type", "unknown"),
-            entry.get("label", "unknown"),
-            entry.get("domain_score", 0.0),
-            raw_data_str,
-            entry.get("snippet", "")
-        ))
+        for entry, domain in entries_with_domains:
+            if domain not in domain_counts:
+                cursor.execute("SELECT COUNT(*) FROM metadata WHERE domain = ?", (domain,))
+                domain_counts[domain] = cursor.fetchone()[0]
+            
+            local_id = domain_counts[domain]
+            raw_data_str = json.dumps(entry["raw_data"], ensure_ascii=False) if entry.get("raw_data") else None
+
+            try:
+                cursor.execute('''
+                    INSERT INTO metadata (
+                        local_id, domain, source, file_hash, type, 
+                        label, domain_score, raw_data, snippet
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    local_id, domain, entry.get("source", ""),
+                    entry.get("file_hash", ""), entry.get("type", "unknown"),
+                    entry.get("label", "unknown"), entry.get("domain_score", 0.0),
+                    raw_data_str, entry.get("snippet", "")
+                ))
+                ids_mapping.append(local_id)
+                domain_counts[domain] += 1 
+            except sqlite3.IntegrityError:
+                ids_mapping.append(None)
+
         conn.commit()
-        return local_id
-    except sqlite3.IntegrityError:
-        return None
+        return ids_mapping
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Erreur lors de l'insertion batch SQL : {e}")
+        return [None] * len(entries_with_domains)
     finally:
         conn.close()
 
@@ -98,13 +105,16 @@ def get_metadata_by_id(doc_id, domain):
     return None
 
 def get_all_metadata():
-    init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT source, file_hash FROM metadata")
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"source": row["source"], "file_hash": row["file_hash"]} for row in rows]
+    try:
+        cursor.execute("SELECT source, file_hash FROM metadata")
+        rows = cursor.fetchall()
+        return [{"source": row["source"], "file_hash": row["file_hash"]} for row in rows]
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        conn.close()
 
 def clear_metadata():
     db_path = config.METADATA_DB_PATH
