@@ -6,6 +6,7 @@ from ingestion.loaders.image_loader import ImageLoader
 from ingestion.loaders.h5_loader import H5Loader
 from ingestion.loaders.txt_loader import TXTLoader
 from ingestion.loaders.tsv_loader import TSVLoader
+from ingestion.loaders.json_loader import JSONLoader
 
 # 1. Mapping direct Extension -> Classe 
 LOADER_MAPPING = {
@@ -13,6 +14,7 @@ LOADER_MAPPING = {
     '.tsv': TSVLoader,    
     '.pdf': PDFLoader,
     '.h5': H5Loader,
+    '.json': JSONLoader,
     '.txt': TXTLoader,
     '.jpg': ImageLoader, '.jpeg': ImageLoader, '.png': ImageLoader, '.webp': ImageLoader
 }
