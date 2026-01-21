@@ -23,7 +23,7 @@ def analyze_dataset_structure(dataset_path):
                     with open(os.path.join(root, f), "r", encoding="utf-8") as txt:
                         lines = [l.strip().lower() for l in txt.readlines() 
                                  if len(l.strip()) >= config.LABEL_MIN_LENGTH]
-                        valid_labels.add(os.path.basename(root).lower()) # Label par dossier
+                        valid_labels.add(os.path.basename(root).lower()) 
                         valid_labels.update(lines)
                 except: pass
 

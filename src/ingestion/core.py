@@ -15,11 +15,12 @@ def process_batch(batch, valid_labels):
     images = [d.get("image") for d in batch if d.get("image") is not None]
     texts = [str(d.get("content", "")) for d in batch if d.get("image") is None]
 
-    # 2. Vectorisation massive (Un seul appel au GPU/CPU par type)
+    # 2. Vectorisation massive
     img_vectors = embed_image_batch(images) if images else []
     txt_vectors = embed_text_batch(texts) if texts else []
 
-    # 3. Finalisation individuelle (Domaine, Label, Stockage)
+    # 3. Finalisation individuelle
+    indexed_count = 0
     img_ptr, txt_ptr = 0, 0
     for doc in batch:
         if doc.get("image"):
@@ -29,8 +30,11 @@ def process_batch(batch, valid_labels):
             vector = txt_vectors[txt_ptr]
             txt_ptr += 1
             
-        # Enregistrement des métadonnées et indexation FAISS
-        _finalize_single_doc(doc, vector, valid_labels)
+        # On passe le hash calculé dans le service
+        if _finalize_single_doc(doc, vector, valid_labels):
+            indexed_count += 1
+            
+    return indexed_count
 
 def _finalize_single_doc(doc, vector, valid_labels):
     """Gère la logique métier et le stockage pour un document unique."""
@@ -38,8 +42,9 @@ def _finalize_single_doc(doc, vector, valid_labels):
     image = doc.get("image", None)
     source_path = doc["source"]
     suggested = doc.get("suggested_label")
+    file_hash = doc.get("file_hash") # Hash récupéré du service
 
-    # Détection du domaine
+    # ON GARDE TON INTELLIGENCE ICI : Détection domaine
     domain, ai_scores, _ = detect_domain(
         text=str(content), pil_image=image, 
         filepath=source_path,
@@ -48,16 +53,17 @@ def _finalize_single_doc(doc, vector, valid_labels):
     )
     score = ai_scores.get(domain, 0.0)
 
-    # Détection du label
+    # ON GARDE TON INTELLIGENCE ICI : Détection label
     if isinstance(content, dict):
         d_name = list(content.keys())[0] if doc.get("type") == "h5" else None
         label = resolve_structured_label(content, source_path, valid_labels, suggested, d_name)
     else:
         label = detect_label(source_path, str(content), image, valid_labels, suggested)
 
-    # Préparation des métadonnées
+    # Préparation des métadonnées (incluant le hash)
     metadata = {
         "source": source_path,
+        "file_hash": file_hash, # Sécurité doublon
         "type": doc["type"],
         "domain": domain,
         "label": label,
@@ -71,7 +77,13 @@ def _finalize_single_doc(doc, vector, valid_labels):
         if text_content.lower() != label.lower():
             metadata["snippet"] = text_content[:500]
 
-    # Persistance
+    # Persistance (store_metadata renvoie None si doublon de hash)
     doc_id = store_metadata(metadata, domain)
-    if vector is not None:
-        add_to_index(domain, vector, doc_id)
+    
+    if doc_id is not None:
+        # Seulement si c'est un nouveau document, on l'ajoute à FAISS
+        if vector is not None:
+            add_to_index(domain, vector, doc_id)
+        return True
+    
+    return False

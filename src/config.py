@@ -30,14 +30,18 @@ LABEL_MAX_LENGTH = 50
 ENABLE_STATISTICAL_FALLBACK = True
 MAX_CLIP_CANDIDATES = 500
 
+# --- PERFORMANCE ---
+BATCH_SIZE = 256 
+INGESTION_CHUNKSIZE = 20 # Nombre de fichiers par worker
+FILE_READ_BUFFER_SIZE = 65536 # Hashing 
+
+OCR_LANG = os.getenv("OCR_LANG", "latin")
+METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"
+
 # --- LOGIQUE MATÉRIEL (DEVICE) ---
 def get_optimal_device():
-    # 1. Priorité absolue à l'override manuel 
     forced = os.getenv("DEVICE_OVERRIDE")
-    if forced:
-        return forced
-
-    # 2. Test de santé du GPU (CUDA)
+    if forced: return forced
     if torch.cuda.is_available():
         try:
             torch.cuda.set_device(0)
@@ -45,16 +49,8 @@ def get_optimal_device():
             return "cuda"
         except Exception:
             return "cpu"
-
-    # 3. Support Mac (M1/M2)
     if torch.backends.mps.is_available():
         return "mps"
-
-    # 4. Par défaut
     return "cpu"
 
 DEVICE = get_optimal_device()
-BATCH_SIZE = 256 # Nombre de documents traités simultanément par CLIP
-OCR_LANG = os.getenv("OCR_LANG", "latin")
-METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"
-INGESTION_CHUNKSIZE = 20
