@@ -54,5 +54,7 @@ def get_optimal_device():
     return "cpu"
 
 DEVICE = get_optimal_device()
-BATCH_SIZE = 32 # Nombre de documents traités simultanément par CLIP
+#Reflexion possible pour adapter le nb de batch en fonction de la mémoire GPU
+BATCH_SIZE = 256 # Nombre de documents traités simultanément par CLIP
 OCR_LANG = os.getenv("OCR_LANG", "latin")
+METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"

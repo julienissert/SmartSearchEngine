@@ -74,6 +74,8 @@ class IngestionService:
         logger.info(f"Matériel utilisé : {config.DEVICE.upper()}")
         logger.info(f"Ressources : {cpu_count} CPUs, {available_ram_gb:.1f} Go RAM disponible.")
         logger.info(f"Workers actifs : {MAX_WORKERS} ({selection_mode}).")
+        # Log du chunksize pour vérifier la conf
+        logger.info(f"Configuration : Batch Size {config.BATCH_SIZE} | Chunksize {config.INGESTION_CHUNKSIZE}")
 
         # --- 2. PRÉPARATION ---
         IngestionService.prepare_database(mode)
@@ -89,8 +91,9 @@ class IngestionService:
             # A. Parsing Parallèle (OCR)
             tasks = [(f, valid_labels) for f in files_to_process]
             with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                # Utilisation du CHUNKSIZE défini dans config.py
                 results = list(tqdm(
-                    executor.map(_worker_load_file, tasks, chunksize=1), 
+                    executor.map(_worker_load_file, tasks, chunksize=config.INGESTION_CHUNKSIZE), 
                     total=total_files, 
                     desc="Ingestion (OCR & Parsing)", 
                     unit="file"
