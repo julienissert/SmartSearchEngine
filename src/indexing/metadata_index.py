@@ -5,7 +5,7 @@ import os
 import shutil
 from pathlib import Path
 import config
-from src.utils.logger import setup_logger
+from utils.logger import setup_logger
 
 logger = setup_logger("MetadataIndex")
 
@@ -47,26 +47,29 @@ def load_metadata_from_disk():
     init_db()
 
 def store_metadata(entry, domain):
-    init_db()
+    """
+    Enregistre les métadonnées en base SQLite.
+    Optimisé pour l'ingestion massive : pas de init_db répétitif.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT COUNT(*) FROM metadata WHERE domain = ?", (domain,))
     local_id = cursor.fetchone()[0]
-    
-    raw_data_str = None
-    if entry.get("raw_data"):
-        raw_data_str = json.dumps(entry["raw_data"], ensure_ascii=False)
+    raw_data_str = json.dumps(entry["raw_data"], ensure_ascii=False) if entry.get("raw_data") else None
 
     try:
         cursor.execute('''
-            INSERT INTO metadata (local_id, domain, source, file_hash, type, label, domain_score, raw_data, snippet)
+            INSERT INTO metadata (
+                local_id, domain, source, file_hash, type, 
+                label, domain_score, raw_data, snippet
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             local_id,
             domain,
             entry.get("source", ""),
-            entry.get("file_hash", ""), # On insère le hash
+            entry.get("file_hash", ""), 
             entry.get("type", "unknown"),
             entry.get("label", "unknown"),
             entry.get("domain_score", 0.0),
@@ -76,7 +79,6 @@ def store_metadata(entry, domain):
         conn.commit()
         return local_id
     except sqlite3.IntegrityError:
-        # Si le hash existe déjà, on ne stocke rien et on renvoie None
         return None
     finally:
         conn.close()
@@ -103,9 +105,6 @@ def get_all_metadata():
     rows = cursor.fetchall()
     conn.close()
     return [{"source": row["source"], "file_hash": row["file_hash"]} for row in rows]
-
-def save_metadata_to_disk():
-    pass
 
 def clear_metadata():
     db_path = config.METADATA_DB_PATH
