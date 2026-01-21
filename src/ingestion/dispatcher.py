@@ -5,10 +5,15 @@ from ingestion.loaders.pdf_loader import PDFLoader
 from ingestion.loaders.image_loader import ImageLoader
 from ingestion.loaders.h5_loader import H5Loader
 from ingestion.loaders.txt_loader import TXTLoader
+from ingestion.loaders.tsv_loader import TSVLoader
 
 # 1. Mapping direct Extension -> Classe 
 LOADER_MAPPING = {
-    '.csv': CSVLoader, '.pdf': PDFLoader, '.h5': H5Loader, '.txt': TXTLoader,
+    '.csv': CSVLoader,
+    '.tsv': TSVLoader,    
+    '.pdf': PDFLoader,
+    '.h5': H5Loader,
+    '.txt': TXTLoader,
     '.jpg': ImageLoader, '.jpeg': ImageLoader, '.png': ImageLoader, '.webp': ImageLoader
 }
 
