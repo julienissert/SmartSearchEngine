@@ -194,3 +194,30 @@ def get_metadata_by_label(label, domain=None, limit=10):
         return results
     finally:
         conn.close()   
+        
+def check_file_status(file_hash, source_path):
+    """
+    Détermine le statut d'un fichier en base.
+    Retourne: 'exists' (inchangé), 'moved' (même hash, nouveau chemin), 'new' (inconnu).
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # On cherche d'abord par Hash (unique)
+    cursor.execute("SELECT source FROM metadata WHERE file_hash = ?", (file_hash,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        if row['source'] == source_path:
+            return 'exists'
+        return 'moved'
+    return 'new'
+
+def update_file_source(file_hash, new_source):
+    """Met à jour le chemin d'un fichier déplacé."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE metadata SET source = ? WHERE file_hash = ?", (new_source, file_hash))
+    conn.commit()
+    conn.close()
