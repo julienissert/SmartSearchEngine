@@ -1,20 +1,29 @@
+version: '3.8'
+
+# Configuration commune pour éviter les répétitions (DRY)
+x-common-config: &common-config
+  image: julienisrt/smartsearchengine:latest
+  # build: . # Décommentez pour builder localement si vous modifiez le code
+  environment:
+    - OCR_LANG=latin
+    - PYTHONPATH=/app
+    - METADATA_DB_PATH=/app/computed-data/metadata/metadata.db
+  volumes:
+    - ./raw-datasets:/app/raw-datasets
+    - ./computed-data:/app/computed-data
+    - ./logs:/app/logs
+    - ./model_cache:/root/.cache/huggingface
+    - ./paddle_cache:/root/.paddleocr
+
 services:
-  # SERVICE 1 : Moteur d'Ingestion (Mode Manuel pour Reset ou Complétion)
-  # Commande pour Reset : docker compose run --rm ingest ingest -m r
-  # Commande pour Complétion : docker compose run --rm ingest ingest -m c
+  # SERVICE 1 : Ingestion Manuelle
+  # Usage : docker compose run --rm ingest -m r
   ingest:
-    image: julienisrt/smartsearchengine:latest
-    container_name: ingest_manual
-    tty: true
+    <<: *common-config
+    container_name: engine_ingest
     stdin_open: true
-    environment:
-      - OCR_LANG=latin
-    volumes:
-      - ./raw-datasets:/app/raw-datasets
-      - ./computed-data:/app/computed-data
-      - ./logs:/app/logs
-      - ./model_cache:/root/.cache/huggingface
-      - ./paddle_cache:/root/.paddleocr
+    tty: true
+    # On n'active pas le GPU par défaut pour l'ingestion manuelle sauf besoin
     # deploy:
     #   resources:
     #     reservations:
@@ -23,41 +32,29 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  # SERVICE 2 : Surveillance Automatique (Watchdog)
+  # SERVICE 2 : Surveillance (Watchdog)
   watcher:
-    image: julienisrt/smartsearchengine:latest
-    container_name: watcher
+    <<: *common-config
+    container_name: engine_watcher
     restart: unless-stopped
-    environment:
-      - OCR_LANG=latin
-    volumes:
-      - ./raw-datasets:/app/raw-datasets
-      - ./computed-data:/app/computed-data
-      - ./logs:/app/logs
-      - ./model_cache:/root/.cache/huggingface
-      - ./paddle_cache:/root/.paddleocr
     command: ["watch"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   # SERVICE 3 : API de Recherche
   search:
-    image: julienisrt/smartsearchengine:latest
-    container_name: search
+    <<: *common-config
+    container_name: engine_search
     ports:
       - "8000:8000"
     restart: unless-stopped
-    volumes:
-      - ./computed-data:/app/computed-data
-      - ./logs:/app/logs
-      - ./model_cache:/root/.cache/huggingface
-      - ./paddle_cache:/root/.paddleocr
     command: ["serve"]
+    # Optionnel : Activer le GPU si vos embeddings/recherche sont lourds
     # deploy:
     #   resources:
     #     reservations:
