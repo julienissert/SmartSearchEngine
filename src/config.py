@@ -1,45 +1,18 @@
 # src/config.py
 import os
-from pathlib import Path
-from dotenv import load_dotenv  
+import psutil
 import torch
+from pathlib import Path
+from dotenv import load_dotenv
 
+# --- INITIALISATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env") 
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
-# --- MODÈLES ---
-TEXT_MODEL_NAME = os.getenv("TEXT_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32")
-
-# --- CHEMINS ---
-DATASET_DIR = BASE_DIR / "raw-datasets"
-COMPUTED_DIR = BASE_DIR / "computed-data"
-FAISS_INDEX_DIR = COMPUTED_DIR / "indexes"
-METADATA_DIR = COMPUTED_DIR / "metadata"
-
-# --- PARAMÈTRES ---
-EMBEDDING_DIM = 512
-TARGET_DOMAINS = ["food", "medical"]
-SEARCH_LARGE_K = 100
-CONSENSUS_THRESHOLD = 15
-MAX_CONFIRMATION_IMAGES = 3
-SEMANTIC_THRESHOLD = 0.65 
-LABEL_MIN_LENGTH = 3
-LABEL_MAX_LENGTH = 50
-ENABLE_STATISTICAL_FALLBACK = True
-MAX_CLIP_CANDIDATES = 500
-
-# --- PERFORMANCE ---
-BATCH_SIZE = 256 
-INGESTION_CHUNKSIZE = 20 # Nombre de fichiers par worker
-FILE_READ_BUFFER_SIZE = 65536 # Hashing 
-
-OCR_LANG = os.getenv("OCR_LANG", "latin")
-METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"
+load_dotenv(BASE_DIR / ".env")
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" 
 
 # --- LOGIQUE MATÉRIEL (DEVICE) ---
 def get_optimal_device():
+    """Détecte le meilleur accélérateur disponible (CUDA > MPS > CPU)."""
     forced = os.getenv("DEVICE_OVERRIDE")
     if forced: return forced
     if torch.cuda.is_available():
@@ -47,10 +20,119 @@ def get_optimal_device():
             torch.cuda.set_device(0)
             torch.zeros(1).to("cuda") 
             return "cuda"
-        except Exception:
-            return "cpu"
-    if torch.backends.mps.is_available():
-        return "mps"
+        except Exception: return "cpu"
+    if torch.backends.mps.is_available(): return "mps"
     return "cpu"
 
 DEVICE = get_optimal_device()
+
+# --- GESTIONNAIRE DE RESSOURCES  ---
+class ResourceManager:
+    def __init__(self):
+        self.total_ram = psutil.virtual_memory().total
+        self.cpu_count = os.cpu_count() or 1
+        self.device = DEVICE
+
+    def _get_gpu_vram_gb(self):
+        """Récupère la VRAM totale en Go si CUDA est actif."""
+        if self.device == "cuda":
+            try:
+                props = torch.cuda.get_device_properties(0)
+                return props.total_memory / (1024**3) 
+            except: return 0
+        return 0
+
+    def get_max_workers(self):
+        """
+        Calcule les workers OCR selon la RAM Système (sécurité anti-swap).
+        """
+        # On réserve 4 Go de sécurité pour le système d'exploitation et CLIP
+        safe_ram = max(0, self.total_ram - (4 * 1024 * 1024 * 1024))
+        
+        # Un worker PaddleOCR consomme ~850 Mo en charge
+        ram_limit = int((safe_ram * 0.8) / (850 * 1024 * 1024))
+        
+        # On plafonne : au moins 1, max CPU-1, max 28 (rendement décroissant)
+        return max(1, min(self.cpu_count - 1, ram_limit, 28))
+
+    def get_batch_size(self):
+        """
+        Calcule la taille de lot CLIP (Batch Size).
+        S'adapte à la VRAM (GPU) ou à la RAM (CPU) pour éviter le crash.
+        """
+        # 1. Base par puissance de calcul et VRAM
+        if self.device == "cuda":
+            vram = self._get_gpu_vram_gb()
+            # Seuils adaptés aux cartes NVIDIA courantes
+            if vram >= 20: base = 512    # A100, 3090, 4090
+            elif vram >= 10: base = 256  # 3080, 2080 Ti, 1080 Ti
+            elif vram >= 6: base = 128   # 3060, 2060, 1660
+            elif vram >= 4: base = 64    # 1050 Ti, T600
+            else: base = 32              # Vieilles cartes (<4Go)
+            
+        elif self.device == "mps":
+            base = 256 # Mac Silicon (M1/M2/M3) gère bien la mémoire unifiée
+        else:
+            # Sur CPU, on évite les goulots d'étranglement mémoire
+            base = 128 if self.cpu_count >= 16 else 64
+
+        # 2. Sécurité RAM Système 
+        ram_capacity = int((self.total_ram * 0.10) / (8 * 1024 * 1024))
+        
+        # 3. Alignement binaire (puissance de 2 pour perf matricielle optimale)
+        optimized_size = min(base, ram_capacity)
+        if optimized_size <= 8: return 8
+        return 2**(optimized_size.bit_length() - 1)
+
+    def get_chunksize(self):
+        """Ajuste la distribution pour minimiser l'overhead IPC."""
+        workers = self.get_max_workers()
+        return max(5, min(50, 300 // workers))
+
+    def get_sql_cache_kb(self):
+        """Budget SQL : 5% de la RAM max, divisé par le nombre de workers."""
+        budget_global = min(1024 * 1024 * 1024, int(self.total_ram * 0.05))
+        return -int((budget_global / self.get_max_workers()) / 1024)
+
+res = ResourceManager()
+
+# --- EXPORTS DYNAMIQUES (Le coeur du système) ---
+MAX_WORKERS = res.get_max_workers()
+BATCH_SIZE = res.get_batch_size()
+INGESTION_CHUNKSIZE = res.get_chunksize()
+DYNAMIC_CACHE_SIZE = res.get_sql_cache_kb()
+
+# Optimisation PyTorch CPU : Évite la "guerre des threads" (Oversubscription)
+if DEVICE == "cpu":
+    torch.set_num_threads(1)
+
+# --- MODÈLES ---
+TEXT_MODEL_NAME = os.getenv("TEXT_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32")
+EMBEDDING_DIM = 512
+
+# --- CHEMINS & AUTO-SETUP ---
+DATASET_DIR = BASE_DIR / "raw-datasets"
+COMPUTED_DIR = BASE_DIR / "computed-data"
+FAISS_INDEX_DIR = COMPUTED_DIR / "indexes"
+METADATA_DIR = COMPUTED_DIR / "metadata"
+METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"
+
+# Création automatique de l'arborescence (Robustesse Pro)
+for path in [COMPUTED_DIR, FAISS_INDEX_DIR, METADATA_DIR]:
+    path.mkdir(parents=True, exist_ok=True)
+
+# --- PARAMÈTRES MÉTIER (Recherche & Qualité) ---
+TARGET_DOMAINS = ["food", "medical"]
+SEMANTIC_THRESHOLD = 0.65 
+CONSENSUS_THRESHOLD = 15
+SEARCH_LARGE_K = 100
+MAX_CLIP_CANDIDATES = 500
+MAX_CONFIRMATION_IMAGES = 3
+ENABLE_STATISTICAL_FALLBACK = True
+
+# --- HYGIÈNE TECHNIQUE ---
+FILE_READ_BUFFER_SIZE = 65536 
+OCR_LANG = os.getenv("OCR_LANG", "latin")
+LABEL_MIN_LENGTH = 3
+LABEL_MAX_LENGTH = 50

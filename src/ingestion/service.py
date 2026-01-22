@@ -23,8 +23,7 @@ def _worker_load_file(args):
     file_path, file_hash, valid_labels = args
     try:
         docs = dispatch_loader(file_path, valid_labels=valid_labels)
-        if not docs:
-            return []
+        if not docs: return []
         
         for i, doc in enumerate(docs):
             doc['source'] = str(file_path)
@@ -37,11 +36,9 @@ def _worker_load_file(args):
     except Exception as e:
         logger.error(f"Erreur worker sur {file_path}: {e}")
         return []
-
 class IngestionService:
     @staticmethod
     def prepare_database(mode='r'):
-        """Prépare les index et la base SQL selon le mode choisi."""
         if mode == 'r':
             reset_all_indexes()
             clear_metadata() 
@@ -59,10 +56,9 @@ class IngestionService:
         all_paths = scan_folder(config.DATASET_DIR)
         
         if mode == 'r':
-            # En mode Reset, on calcule juste les hashes pour les workers
             return [(f, calculate_fast_hash(f)) for f in all_paths]
 
-        # --- LOGIQUE FAST-CHECK ---
+        # LOGIQUE FAST-CHECK (Mode Complétion)
         to_process = []
         skipped, moved = 0, 0
         
@@ -80,22 +76,16 @@ class IngestionService:
             else:
                 to_process.append((f, f_hash))
                 
-        logger.info(f"Résultat Fast-Check : {skipped} inchangés, {moved} déplacés, {len(to_process)} à traiter.")
+        logger.info(f"Fast-Check : {skipped} inchangés, {moved} déplacés, {len(to_process)} à traiter.")
         return to_process
 
     @staticmethod
     def run_workflow(mode='r'):
-        """Orchestre le pipeline d'ingestion complet en streaming."""
-        cpu_count = os.cpu_count() or 1
-        MAX_WORKERS = min(cpu_count - 2, 28)
-
-        logger.info(f"--- Démarrage Workflow (Mode: {mode}) ---")
+        """Orchestre le pipeline avec l'intelligence adaptative du config."""       
+        logger.info(f"--- Démarrage Workflow (Workers: {config.MAX_WORKERS} | Batch: {config.BATCH_SIZE} | Device: {config.DEVICE}) ---")
         
-        # 1. Préparation
         IngestionService.prepare_database(mode)
         valid_labels = analyze_dataset_structure(config.DATASET_DIR)
-        
-        # 2. Filtrage intelligent des fichiers
         files_info = IngestionService.get_files_to_ingest(mode)
         
         total_files = len(files_info)
@@ -106,11 +96,13 @@ class IngestionService:
         total_indexed = 0
         stream_buffer = [] 
 
-        # 3. Ingestion par batch
         try:
             tasks = [(f, h, valid_labels) for f, h in files_info]
             
-            with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Utilisation de config.MAX_WORKERS pour respecter la RAM
+            with concurrent.futures.ProcessPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
+                
+                # Utilisation de config.INGESTION_CHUNKSIZE pour l'équilibre
                 results_gen = executor.map(_worker_load_file, tasks, chunksize=config.INGESTION_CHUNKSIZE)
                 
                 pbar = tqdm(total=total_files, desc="Streaming Ingestion")
@@ -119,9 +111,10 @@ class IngestionService:
                     if res:
                         stream_buffer.extend(res)
                     
+                    # Utilisation de config.BATCH_SIZE (variable selon GPU/CPU)
                     if len(stream_buffer) >= config.BATCH_SIZE:
                         total_indexed += process_batch(stream_buffer, valid_labels)
-                        stream_buffer = [] 
+                        stream_buffer = [] # Vidage immédiat pour la RAM
                     
                     pbar.update(1)
 

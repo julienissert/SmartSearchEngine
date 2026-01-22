@@ -10,38 +10,12 @@ import psutil
 
 logger = setup_logger("MetadataIndex")
 
-def calculate_safe_cache_size():
-    """
-    Calcule dynamiquement un cache SQLite sécurisé en fonction de l'ordi.
-    """
-    try:
-        # 1. Récupérer la RAM totale du système
-        total_ram = psutil.virtual_memory().total
-        
-        # 2. Définir un budget SQL  
-        global_sql_budget = min(2 * 1024 * 1024 * 1024, int(total_ram * 0.05))
-        
-        # 3. Récupérer le nombre de cœurs (workers) qui vont se partager la DB
-        num_workers = os.cpu_count() or 1
-        
-        # 4. Calculer le cache par worker en KB
-        cache_kb = int((global_sql_budget / num_workers) / 1024)
-        
-        # 5. Sécurité (Clamping) : entre 4 Mo et 128 Mo par worker
-        safe_cache_kb = max(4000, min(128000, cache_kb))
-        
-        return -safe_cache_kb
-    except Exception:
-        return -16000
-
-DYNAMIC_CACHE_SIZE = calculate_safe_cache_size()
-
 def get_db_connection():
     conn = sqlite3.connect(config.METADATA_DB_PATH)
     conn.row_factory = sqlite3.Row 
     
     conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute(f"PRAGMA cache_size={DYNAMIC_CACHE_SIZE}")
+    conn.execute(f"PRAGMA cache_size={config.DYNAMIC_CACHE_SIZE}")
     
     return conn
 
