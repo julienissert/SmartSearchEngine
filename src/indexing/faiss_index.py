@@ -4,53 +4,77 @@ import shutil
 import faiss
 import numpy as np
 import config
+from utils.logger import setup_logger
 
-indexes = {}
+logger = setup_logger("FaissIndex")
 
-def load_all_indexes():
-    """Charge tous les index existants du disque vers la RAM."""
-    global indexes
-    if not os.path.exists(config.FAISS_INDEX_DIR):    
-        return
-    
-    for filename in os.listdir(config.FAISS_INDEX_DIR):
-        if filename.endswith(".index"):
-            domain = filename.replace(".index", "")
-            path = os.path.join(config.FAISS_INDEX_DIR, filename)
-            indexes[domain] = faiss.read_index(path)
-            
+indices = {}
+
 def get_index_path(domain):
     return os.path.join(config.FAISS_INDEX_DIR, f"{domain}.index")
 
+def get_index(domain):
+    """Initialise ou récupère un index HNSW pour un domaine."""
+    global indices
+    if domain not in indices:
+        path = get_index_path(domain)
+        if os.path.exists(path):
+            # 1. Chargement d'un index existant
+            index = faiss.read_index(path)
+            index.hnsw.efSearch = config.FAISS_HNSW_EF_SEARCH
+            indices[domain] = index
+            logger.info(f"Index HNSW [{domain}] chargé (efSearch={config.FAISS_HNSW_EF_SEARCH})")
+        else:
+            # 2. Création d'un nouvel index HNSWFlat
+            index = faiss.IndexHNSWFlat(config.EMBEDDING_DIM, config.FAISS_HNSW_M)
+            
+            # Paramètres de précision/vitesse 
+            index.hnsw.efConstruction = config.FAISS_HNSW_EF_CONSTRUCTION
+            index.hnsw.efSearch = config.FAISS_HNSW_EF_SEARCH
+            
+            indices[domain] = index
+            logger.info(f"Nouvel index HNSW [{domain}] créé (M={config.FAISS_HNSW_M}, efC={config.FAISS_HNSW_EF_CONSTRUCTION})")
+            
+    return indices[domain]
+
+def load_all_indexes():
+    """Charge tous les index existants au démarrage."""
+    if not os.path.exists(config.FAISS_INDEX_DIR):    
+        return
+    for filename in os.listdir(config.FAISS_INDEX_DIR):
+        if filename.endswith(".index"):
+            domain = filename.replace(".index", "")
+            get_index(domain) 
+
 def reset_all_indexes():
     """Vide la RAM et supprime les fichiers sur le disque."""
-    global indexes
-    indexes = {} # Réinitialise le cache mémoire
+    global indices
+    indices = {} 
     if os.path.exists(config.FAISS_INDEX_DIR):
         shutil.rmtree(config.FAISS_INDEX_DIR)
     os.makedirs(config.FAISS_INDEX_DIR, exist_ok=True)
-    print(f"Index FAISS réinitialisés dans : {config.FAISS_INDEX_DIR}")
+    logger.info("Tous les index FAISS (HNSW) ont été réinitialisés.")
 
-def add_to_index(domain, vector, doc_id):
-    """Ajoute un vecteur en RAM uniquement (Opération quasi instantanée)."""
-    # 1. On vérifie si l'index est déjà chargé en RAM
-    if domain not in indexes:
-        path = get_index_path(domain)
-        if os.path.exists(path):
-            indexes[domain] = faiss.read_index(path)
-        else:
-            # Création d'un nouvel index vide en RAM
-            base_index = faiss.IndexFlatL2(config.EMBEDDING_DIM)
-            indexes[domain] = faiss.IndexIDMap(base_index)
+def add_to_index(domain, vector, doc_id=None):
+    """Ajoute un vecteur à l'index HNSW."""
+    if vector is None:
+        return
+
+    index = get_index(domain)
     
-    # 2. Ajout technique dans la structure en mémoire vive
-    v = np.array([vector]).astype("float32")
-    ids = np.array([doc_id]).astype("int64")
-    indexes[domain].add_with_ids(v, ids)
+    if hasattr(vector, "detach"):
+        vector = vector.detach().cpu().numpy()
+    
+    v = np.array(vector).astype("float32")
+    if v.ndim == 1:
+        v = v.reshape(1, -1)
+    
+    index.add(v)
 
 def save_all_indexes():
-    """Sauvegarde physique de tous les index de la RAM vers le disque (Une seule fois à la fin)."""
+    """Sauvegarde physique des index vers le disque."""
     os.makedirs(config.FAISS_INDEX_DIR, exist_ok=True)
-    for domain, index in indexes.items():
+    for domain, index in indices.items():
         path = get_index_path(domain)
         faiss.write_index(index, path)
+        logger.info(f"Index HNSW [{domain}] sauvegardé.")

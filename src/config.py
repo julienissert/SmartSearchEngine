@@ -93,6 +93,33 @@ class ResourceManager:
         """Budget SQL : 5% de la RAM max, divisé par le nombre de workers."""
         budget_global = min(1024 * 1024 * 1024, int(self.total_ram * 0.05))
         return -int((budget_global / self.get_max_workers()) / 1024)
+    
+    def get_hnsw_params(self):
+        """
+        Calcule les paramètres HNSW selon la RAM et le CPU.
+        M : Densité du graphe (impact RAM).
+        ef_c : Précision construction (impact CPU).
+        """
+        ram_gb = self.total_ram / (1024**3)
+        
+        # 1. Ajustement de M (Densité)
+        if ram_gb >= 64:   M = 48  # Serveur de calcul : précision max
+        elif ram_gb >= 32: M = 32  # Machine pro standard
+        elif ram_gb >= 16: M = 24  # Laptop correct
+        else:              M = 16  # Configuration légère
+        
+        # 2. Ajustement de ef_construction (Temps d'ingestion vs Qualité)
+        # Si on a beaucoup de coeurs, on peut se permettre une construction plus fine
+        if self.cpu_count >= 16: ef_c = 128
+        elif self.cpu_count >= 8: ef_c = 64
+        else:                     ef_c = 40
+        
+        # 3. ef_search (Vitesse de réponse)
+        # On reste sur une valeur équilibrée, ajustable par l'utilisateur
+        ef_s = 64 if ram_gb >= 16 else 32
+        
+        return M, ef_c, ef_s
+
 
 res = ResourceManager()
 
@@ -101,6 +128,7 @@ MAX_WORKERS = res.get_max_workers()
 BATCH_SIZE = res.get_batch_size()
 INGESTION_CHUNKSIZE = res.get_chunksize()
 DYNAMIC_CACHE_SIZE = res.get_sql_cache_kb()
+FAISS_HNSW_M, FAISS_HNSW_EF_CONSTRUCTION, FAISS_HNSW_EF_SEARCH = res.get_hnsw_params()
 
 # Optimisation PyTorch CPU : Évite la "guerre des threads" (Oversubscription)
 if DEVICE == "cpu":
