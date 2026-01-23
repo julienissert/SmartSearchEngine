@@ -5,15 +5,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # --- CRITIQUE : SÉCURITÉ ANTI-DEADLOCK ---
-# Doit être défini AVANT l'import de torch/numpy
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-import torch  # Import torch seulement maintenant
+import torch 
 
 # --- INITIALISATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,15 +44,33 @@ class ResourceManager:
         # On réduit légèrement pour laisser respirer le système
         safe_ram = max(0, self.total_ram - (4 * 1024 * 1024 * 1024))
         ram_limit = int((safe_ram * 0.8) / (850 * 1024 * 1024))
-        # Plafond à 10 workers max si on est sur GPU pour éviter la famine CPU
-        # Sur CPU only, on peut monter plus haut
-        cpu_limit = self.cpu_count - 2
-        return max(1, min(cpu_limit, ram_limit, 20))
+        
+        if self.device == "cpu":
+            cpu_limit = max(1, int(self.cpu_count * 0.4)) #à valider 40% OCR seulement 
+        else:
+            cpu_limit = self.cpu_count - 2
+            
+        return max(1, min(cpu_limit, ram_limit, 28))
+
+    def get_torch_threads(self):
+        if self.device != "cpu": return 1
+        workers = self.get_max_workers()
+        return max(1, self.cpu_count - workers)
 
     def get_batch_size(self):
-        if self.device == "cuda": return 256
-        return 128 if self.cpu_count >= 16 else 64
 
+        # --- LOGIQUE GPU (CUDA) ---
+        if self.device == "cuda":
+            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            if vram_gb >= 20: return 1024  
+            if vram_gb >= 10: return 512   
+            return 256                     
+
+        # --- LOGIQUE CPU (Multi-niveaux) ---
+        if self.cpu_count >= 30: return 512
+        if self.cpu_count >= 16: return 256
+        return 128 if self.cpu_count >= 8 else 64
+    
     def get_chunksize(self):
         return max(5, min(50, 300 // self.get_max_workers()))
 
@@ -63,7 +81,7 @@ class ResourceManager:
     def get_hnsw_params(self):
         ram_gb = self.total_ram / (1024**3)
         M = 48 if ram_gb >= 64 else 32
-        ef_c = 128
+        ef_c = 40 
         ef_s = 64
         return M, ef_c, ef_s
 
@@ -80,7 +98,7 @@ OCR_FORCE_CPU = True
 LABEL_BATCH_SIZE = 1000
 
 if DEVICE == "cpu":
-    torch.set_num_threads(1)
+    torch.set_num_threads(res.get_torch_threads())
 
 TEXT_MODEL_NAME = os.getenv("TEXT_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL", "openai/clip-vit-base-patch32")
