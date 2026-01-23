@@ -1,6 +1,6 @@
 # src/ingestion/folder_scanner.py
 import os
-from ingestion.dispatcher import get_supported_extensions 
+from src.ingestion.dispatcher import get_supported_extensions 
 
 def scan_folder(folder):
     files = []

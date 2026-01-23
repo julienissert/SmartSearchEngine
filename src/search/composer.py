@@ -1,6 +1,6 @@
 # src/search/composer.py
-import config
-from indexing.metadata_index import get_metadata_by_id
+from src import config
+from src.indexing.metadata_index import get_metadata_by_id
 
 class ResultComposer:
     def build_response(self, matches, ocr_text):

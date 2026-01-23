@@ -2,8 +2,8 @@
 import sqlite3
 import json
 import os
-import config
-from utils.logger import setup_logger
+from src import config
+from src.utils.logger import setup_logger
 
 logger = setup_logger("MetadataIndex")
 

@@ -1,7 +1,7 @@
 # src/utils/environment.py
 import importlib
-from src import config  # Correction : style package
-from src.utils.logger import setup_logger # Correction : style package
+from src import config  
+from src.utils.logger import setup_logger 
 
 logger = setup_logger("EnvChecker")
 

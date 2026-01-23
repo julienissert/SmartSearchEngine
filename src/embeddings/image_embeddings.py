@@ -1,7 +1,7 @@
 # src/embeddings/image_embeddings.py
 import torch
 import multiprocessing
-import config
+from src import config
 import numpy as np
 from transformers import CLIPProcessor, CLIPModel
 
@@ -15,7 +15,7 @@ def get_model():
         is_worker = any(x in current_proc for x in ["Process-", "ForkPoolWorker", "engine_ingest"])
         device = "cpu" if is_worker else config.DEVICE
         
-        print(f"🔄 Chargement CLIP IMAGE sur {device} (Process: {current_proc})")
+        print(f"Chargement CLIP IMAGE sur {device} (Process: {current_proc})")
         
         _model = CLIPModel.from_pretrained(config.IMAGE_MODEL_NAME).to(device)
         _processor = CLIPProcessor.from_pretrained(config.IMAGE_MODEL_NAME)

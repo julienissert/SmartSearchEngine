@@ -3,8 +3,8 @@ import faiss
 import numpy as np
 import os
 import pickle
-import config
-from utils.logger import setup_logger
+from src import config
+from src.utils.logger import setup_logger
 
 logger = setup_logger("FaissIndex")
 

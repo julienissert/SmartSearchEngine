@@ -1,18 +1,20 @@
 # src/ingestion/core.py
-import config
+from src import config
 import numpy as np
-from embeddings.text_embeddings import embed_text_batch
-from embeddings.image_embeddings import embed_image_batch
-from utils.domain_detector import detect_domain
-from indexing.faiss_index import add_to_index
-from indexing.metadata_index import store_metadata_batch 
+from src.embeddings.text_embeddings import embed_text_batch
+from src.embeddings.image_embeddings import embed_image_batch
+from src.utils.domain_detector import detect_domain
+from src.indexing.faiss_index import add_to_index
+from src.indexing.metadata_index import store_metadata_batch 
 
 def process_batch(batch_docs, valid_labels):
     if not batch_docs: return 0
 
-    # 1. Vectorisation (GPU/CPU)
+    # 1. Vectorisation massive (GPU/CPU)
     texts = [str(d.get('content') or '') for d in batch_docs]
-    images = [d.get('pil_image') for d in batch_docs]
+    
+    # MODIFICATION 1 : Utilisation de la clé 'image' (cohérent avec ImageLoader)
+    images = [d.get('image') for d in batch_docs] 
     
     text_vectors = embed_text_batch(texts)
     
@@ -25,13 +27,13 @@ def process_batch(batch_docs, valid_labels):
         for i, idx in enumerate(valid_image_indices):
             image_vectors[idx] = actual_vectors[i]
 
-    # 2. Construction
+    # 2. Construction et Nettoyage
     metadata_buffer = []
     
     for i, doc in enumerate(batch_docs):
         safe_content = str(doc.get('content') or '')
-        doc['domain'] = detect_domain(safe_content, doc.get('pil_image'))
         
+        # MODIFICATION 2 : Calcul du vecteur AVANT la détection de domaine
         vecs = []
         if text_vectors[i] is not None: vecs.append(text_vectors[i])
         if image_vectors[i] is not None: vecs.append(image_vectors[i])
@@ -40,16 +42,24 @@ def process_batch(batch_docs, valid_labels):
             final_vector = np.zeros(config.EMBEDDING_DIM)
         else:
             final_vector = np.mean(vecs, axis=0)
+            
+        # MODIFICATION 3 : Suppression du double calcul (on passe precomputed_vector)
+        # On passe None pour pil_image car le travail est déjà fait dans final_vector
+        doc['domain'] = detect_domain(safe_content, None, precomputed_vector=final_vector)
+        
+        # MODIFICATION 4 : Libération CRITIQUE de la RAM
+        # On supprime l'image PIL lourde immédiatement après vectorisation
+        if 'image' in doc:
+            del doc['image']
         
         # Ajout FAISS
         faiss_id = add_to_index(final_vector, doc['domain'])
         
-        # SÉCURITÉ : On ignore les documents "unknown" qui renvoient -1
         if faiss_id == -1:
             continue
 
         metadata_buffer.append({
-            'id': int(faiss_id), # Conversion explicite en int Python
+            'id': int(faiss_id),
             'source': str(doc.get('source')),
             'file_hash': str(doc.get('file_hash')),
             'domain': str(doc.get('domain')),
@@ -61,4 +71,4 @@ def process_batch(batch_docs, valid_labels):
     if metadata_buffer:
         store_metadata_batch(metadata_buffer)
 
-    return len(metadata_buffer) # Retourne le nombre réel inséré
+    return len(metadata_buffer)

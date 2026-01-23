@@ -2,49 +2,59 @@
 import sys
 import os
 import multiprocessing
+import argparse
 
 # --- CORRECTIF CRITIQUE GPU ---
-# Force les workers à démarrer "à neuf" (Spawn) au lieu de cloner le parent (Fork).
-# Cela empêche les workers d'hériter du contexte CUDA et de saturer la VRAM.
 if __name__ == "__main__":
     try:
         multiprocessing.set_start_method('spawn', force=True)
     except RuntimeError:
         pass
 
-from utils.environment import check_environment
-from utils.logger import setup_logger
+# --- IMPORTS ÉLITE (Tous préfixés par src.) ---
+from src.utils.environment import check_environment
+from src.utils.logger import setup_logger
+from src.utils.watcher import start_watching
 
 logger = setup_logger("Main")
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python src/main.py [ingest|watch|serve] [options]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Moteur de Recherche Multimodal Élite")
+    subparsers = parser.add_subparsers(dest="command", help="Commandes disponibles")
 
-    command = sys.argv[1]
+    # Commande Ingest
+    ingest_parser = subparsers.add_parser("ingest", help="Lancer l'ingestion des données")
+    ingest_parser.add_argument("-m", "--mode", choices=['r', 'c'], default='c', 
+                                help="r: reset (réinitialiser), c: compléter")
 
-    # Vérification environnementale avant tout
+    # Commande Watch
+    subparsers.add_parser("watch", help="Lancer la surveillance en temps réel")
+
+    # Commande Serve
+    subparsers.add_parser("serve", help="Démarrer l'API de recherche")
+
+    args = parser.parse_args()
+
+    # Vérification de l'environnement
     if not check_environment():
         logger.error("Environnement invalide. Arrêt.")
         sys.exit(1)
 
-    if command == "ingest":
-        from ingestion.main import run_ingestion_logic
-        run_ingestion_logic()
+    if args.command == "ingest":
+        from src.ingestion.main import run_ingestion_logic
+        run_ingestion_logic(mode=args.mode)
     
-    elif command == "watch":
-        from utils.watcher import start_watcher
-        start_watcher()
+    elif args.command == "watch":
+        logger.info(" Lancement du mode surveillance...")
+        start_watching()
         
-    elif command == "serve":
+    elif args.command == "serve":
         import uvicorn
-        # Lancement de l'API
-        uvicorn.run("search.main:app", host="0.0.0.0", port=8000, reload=False)
+        logger.info("Démarrage de l'API sur http://localhost:8000")
+        uvicorn.run("src.search.main:app", host="0.0.0.0", port=8000, reload=False)
         
     else:
-        logger.error(f"Commande inconnue: {command}")
-        sys.exit(1)
+        parser.print_help()
 
 if __name__ == "__main__":
     main()

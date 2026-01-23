@@ -1,8 +1,8 @@
 # src/utils/label_detector.py
 import os
-import config
+from src import config
 from collections import Counter
-from embeddings.text_embeddings import embed_text_batch 
+from src.embeddings.text_embeddings import embed_text_batch 
 
 from .handlers.structured_handler import resolve_structured_label
 from .handlers.raw_handler import detect_label

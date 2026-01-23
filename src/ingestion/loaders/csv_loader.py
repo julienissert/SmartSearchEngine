@@ -1,6 +1,6 @@
 # src/ingestion/loaders/csv_loader.py
 import pandas as pd
-from ingestion.loaders.base_loader import BaseLoader
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class CSVLoader(BaseLoader):
     def get_supported_extensions(self):

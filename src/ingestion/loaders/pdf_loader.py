@@ -1,6 +1,6 @@
 # src/ingestion/loaders/pdf_loader.py
 import fitz  
-from ingestion.loaders.base_loader import BaseLoader
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class PDFLoader(BaseLoader):
     def get_supported_extensions(self):

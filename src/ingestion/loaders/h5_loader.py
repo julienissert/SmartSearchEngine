@@ -1,6 +1,6 @@
 # src/ingestion/loaders/h5_loader.py
 import h5py
-from ingestion.loaders.base_loader import BaseLoader
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class H5Loader(BaseLoader):
     def get_supported_extensions(self):

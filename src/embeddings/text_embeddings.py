@@ -1,7 +1,7 @@
 # src/embeddings/text_embeddings.py
 import torch
 import multiprocessing
-import config
+from src import config
 import numpy as np
 from transformers import CLIPModel, CLIPTokenizer
 
@@ -18,7 +18,7 @@ def get_model():
         
         device = "cpu" if is_worker else config.DEVICE
         
-        print(f"🔄 Chargement CLIP TEXTE sur {device} (Process: {current_proc})")
+        print(f"Chargement CLIP TEXTE sur {device} (Process: {current_proc})")
         
         _model = CLIPModel.from_pretrained(config.IMAGE_MODEL_NAME).to(device)
         _tokenizer = CLIPTokenizer.from_pretrained(config.IMAGE_MODEL_NAME)

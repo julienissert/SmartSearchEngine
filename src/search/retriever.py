@@ -2,11 +2,11 @@
 import faiss
 import os
 import numpy as np
-import config
+from src import config
 from collections import Counter
-from embeddings.text_embeddings import embed_text
-from indexing.metadata_index import get_metadata_by_id, load_metadata_from_disk, get_metadata_by_label
-from utils.logger import setup_logger
+from src.embeddings.text_embeddings import embed_text
+from src.indexing.metadata_index import get_metadata_by_id, load_metadata_from_disk, get_metadata_by_label
+from src.utils.logger import setup_logger
 
 logger = setup_logger("SearchEngine", log_file="search.log")
 

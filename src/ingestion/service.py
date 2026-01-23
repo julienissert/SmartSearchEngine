@@ -3,20 +3,20 @@ import os
 import hashlib
 import concurrent.futures
 import psutil
-import torch # Nécessaire pour vider le cache GPU
+import torch 
 from tqdm import tqdm
 
-import config
-from ingestion.folder_scanner import scan_folder
-from ingestion.dispatcher import dispatch_loader
-from ingestion.core import process_batch
-from indexing.faiss_index import reset_all_indexes, load_all_indexes, save_all_indexes
-from indexing.metadata_index import (
+from src import config
+from src.ingestion.folder_scanner import scan_folder
+from src.ingestion.dispatcher import dispatch_loader
+from src.ingestion.core import process_batch
+from src.indexing.faiss_index import reset_all_indexes, load_all_indexes, save_all_indexes
+from src.indexing.metadata_index import (
     init_db, clear_metadata, check_file_status, update_file_source, load_metadata_from_disk
 )
-from utils.label_detector import analyze_dataset_structure
-from utils.preprocessing import calculate_fast_hash
-from utils.logger import setup_logger
+from src.utils.label_detector import analyze_dataset_structure
+from src.utils.preprocessing import calculate_fast_hash
+from src.utils.logger import setup_logger
 
 logger = setup_logger("IngestionService")
 
@@ -108,19 +108,22 @@ class IngestionService:
             ) as executor:
                 
                 results_gen = executor.map(_worker_load_file, tasks, chunksize=config.INGESTION_CHUNKSIZE)
-                pbar = tqdm(total=total_files, desc="🚀 Streaming Ingestion")
+                pbar = tqdm(total=total_files, desc=" Streaming Ingestion")
                 
                 for res in results_gen:
                     if res:
                         stream_buffer.extend(res)
                     
-                    # Traitement par lots sur GPU
-                    if len(stream_buffer) >= config.BATCH_SIZE:
-                        total_indexed += process_batch(stream_buffer, valid_labels)
-                        stream_buffer = [] 
+                    # --- CORRECTION ÉLITE : BATCHING STRICT ---
+                    # On traite tant qu'on a assez de documents pour faire au moins un lot complet
+                    while len(stream_buffer) >= config.BATCH_SIZE:
+                        # On extrait exactement la taille autorisée par config.BATCH_SIZE
+                        current_batch = stream_buffer[:config.BATCH_SIZE]
+                        stream_buffer = stream_buffer[config.BATCH_SIZE:] # On garde le reste pour le tour suivant
                         
-                        # --- NETTOYAGE VRAM CRITIQUE ---
-                        # Libère la mémoire fragmentée après chaque batch
+                        total_indexed += process_batch(current_batch, valid_labels)
+                        
+                        # Libération immédiate de la VRAM après chaque passage GPU
                         if config.DEVICE == "cuda":
                             torch.cuda.empty_cache()
                             

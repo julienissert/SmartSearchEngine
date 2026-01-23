@@ -49,7 +49,7 @@ class DatasetHandler(FileSystemEventHandler):
             mode = "r"
             logger.info("Base vide détectée -> Mode Réinitialisation (r)")
         
-        logger.info(f"🚀 Déclenchement automatique de l'ingestion (Mode: {mode})")
+        logger.info(f"Déclenchement automatique de l'ingestion (Mode: {mode})")
         
         try:
             # CORRECTIF : Le répertoire de travail (cwd) doit être config.BASE_DIR.
@@ -60,11 +60,11 @@ class DatasetHandler(FileSystemEventHandler):
                 check=True,
                 cwd=str(config.BASE_DIR)
             )
-            logger.info("✅ Ingestion automatique terminée avec succès.")
+            logger.info("Ingestion automatique terminée avec succès.")
         except subprocess.CalledProcessError as e:
-            logger.error(f"❌ Échec de l'ingestion automatique (Code de sortie: {e.returncode}).")
+            logger.error(f"Échec de l'ingestion automatique (Code de sortie: {e.returncode}).")
         except Exception as e:
-            logger.error(f"❌ Erreur lors de l'exécution du processus d'ingestion : {e}")
+            logger.error(f"Erreur lors de l'exécution du processus d'ingestion : {e}")
 
 def start_watching():
     """Point d'entrée principal du service de surveillance."""
@@ -78,7 +78,7 @@ def start_watching():
     observer.schedule(handler, str(config.DATASET_DIR), recursive=True)
     observer.start()
     
-    logger.info(f"👀 SmartSearch Watcher actif sur : {config.DATASET_DIR}")
+    logger.info(f"SmartSearch Watcher actif sur : {config.DATASET_DIR}")
 
     try:
         while True:

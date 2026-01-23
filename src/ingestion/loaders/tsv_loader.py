@@ -1,6 +1,6 @@
 # src/ingestion/loaders/tsv_loader.py
 import pandas as pd
-from ingestion.loaders.base_loader import BaseLoader
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class TSVLoader(BaseLoader):
     def get_supported_extensions(self):

@@ -1,7 +1,7 @@
 # src/utils/handlers/structured_handler.py
 import numpy as np
-import config
-from embeddings.text_embeddings import embed_text
+from src import config
+from src.embeddings.text_embeddings import embed_text
 
 # Cache pour mémoriser la colonne cible par fichier/dataset
 _STRUCTURED_FILE_CACHE = {}

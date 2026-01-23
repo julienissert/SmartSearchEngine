@@ -3,6 +3,7 @@ import os
 import psutil
 from pathlib import Path
 from dotenv import load_dotenv
+import torch 
 
 # --- CRITIQUE : SÉCURITÉ ANTI-DEADLOCK ---
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -11,9 +12,6 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-import torch 
 
 # --- INITIALISATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,15 +40,15 @@ class ResourceManager:
 
     def get_max_workers(self):
         # On réduit légèrement pour laisser respirer le système
-        safe_ram = max(0, self.total_ram - (4 * 1024 * 1024 * 1024))
-        ram_limit = int((safe_ram * 0.8) / (850 * 1024 * 1024))
-        
+        safe_ram = max(0, self.total_ram - (6 * 1024 * 1024 * 1024))
+        ram_limit = int((safe_ram * 0.8) / (1200 * 1024 * 1024))    
+            
         if self.device == "cpu":
             cpu_limit = max(1, int(self.cpu_count * 0.4)) #à valider 40% OCR seulement 
         else:
-            cpu_limit = self.cpu_count - 2
+            cpu_limit = self.cpu_count - 1
             
-        return max(1, min(cpu_limit, ram_limit, 28))
+        return max(1, min(cpu_limit, ram_limit, 24))
 
     def get_torch_threads(self):
         if self.device != "cpu": return 1
@@ -72,7 +70,8 @@ class ResourceManager:
         return 128 if self.cpu_count >= 8 else 64
     
     def get_chunksize(self):
-        return max(5, min(50, 300 // self.get_max_workers()))
+        return 1
+        #return max(5, min(50, 300 // self.get_max_workers()))
 
     def get_sql_cache_kb(self):
         budget = min(1024 * 1024 * 1024, int(self.total_ram * 0.05))

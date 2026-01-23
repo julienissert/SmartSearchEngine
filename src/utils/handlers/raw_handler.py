@@ -2,9 +2,9 @@
 import os
 import re
 import numpy as np
-import config
+from src import config
 from collections import Counter
-from embeddings.image_embeddings import embed_image
+from src.embeddings.image_embeddings import embed_image
 
 def detect_label(filepath=None, text=None, image=None, label_mapping=None, suggested_label=None):
     """Détecteur universel (Image/PDF/TXT) incluant la Couche 0."""

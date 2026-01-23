@@ -2,8 +2,8 @@
 import numpy as np
 from PIL import Image
 from paddleocr import PaddleOCR
-from ingestion.loaders.base_loader import BaseLoader
-import config
+from src.ingestion.loaders.base_loader import BaseLoader
+from src import config
 
 # Instance globale pour le processus en cours (évite de recharger le modèle à chaque fichier)
 _ocr_engine = None

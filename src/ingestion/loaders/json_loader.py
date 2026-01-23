@@ -1,6 +1,6 @@
 # src/ingestion/loaders/json_loader.py
 import json
-from ingestion.loaders.base_loader import BaseLoader
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class JSONLoader(BaseLoader):
     def get_supported_extensions(self):

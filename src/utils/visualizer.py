@@ -4,8 +4,7 @@ import os
 import hashlib
 from pathlib import Path
 
-# Configuration des chemins pour les imports
-# On s'assure que le dossier 'src' est dans le chemin de recherche
+
 SRC_DIR = Path(__file__).resolve().parent.parent
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
@@ -14,9 +13,9 @@ import numpy as np
 import plotly.express as px
 from sklearn.decomposition import PCA
 
-import indexing.faiss_index as faiss_idx
-import indexing.metadata_index as meta_idx
-import config
+import src.indexing.faiss_index as faiss_idx
+import src.indexing.metadata_index as meta_idx
+from src import config
 
 def get_pastel_color(name):
     """Génère une couleur pastel unique et stable à partir d'une chaîne de caractères."""

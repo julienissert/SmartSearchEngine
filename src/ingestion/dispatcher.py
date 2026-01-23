@@ -1,12 +1,12 @@
 # src/ingestion/dispatcher.py
 import os
-from ingestion.loaders.csv_loader import CSVLoader
-from ingestion.loaders.pdf_loader import PDFLoader
-from ingestion.loaders.image_loader import ImageLoader
-from ingestion.loaders.h5_loader import H5Loader
-from ingestion.loaders.txt_loader import TXTLoader
-from ingestion.loaders.tsv_loader import TSVLoader
-from ingestion.loaders.json_loader import JSONLoader
+from src.ingestion.loaders.csv_loader import CSVLoader
+from src.ingestion.loaders.pdf_loader import PDFLoader
+from src.ingestion.loaders.image_loader import ImageLoader
+from src.ingestion.loaders.h5_loader import H5Loader
+from src.ingestion.loaders.txt_loader import TXTLoader
+from src.ingestion.loaders.tsv_loader import TSVLoader
+from src.ingestion.loaders.json_loader import JSONLoader
 
 # 1. Mapping direct Extension -> Classe 
 LOADER_MAPPING = {

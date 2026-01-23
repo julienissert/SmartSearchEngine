@@ -1,7 +1,7 @@
 # ingestion/loaders/txt_loader.py
 import os
-from utils.preprocessing import clean_text
-from ingestion.loaders.base_loader import BaseLoader
+from src.utils.preprocessing import clean_text
+from src.ingestion.loaders.base_loader import BaseLoader
 
 class TXTLoader(BaseLoader):
     def get_supported_extensions(self):
