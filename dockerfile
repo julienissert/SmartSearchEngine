@@ -28,6 +28,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     export CFLAGS="-Wno-error=incompatible-pointer-types" && \
     pip install --no-cache-dir -r requirements.txt
 
+# --- AJOUT SÉCURITÉ THREADS ---
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+
 # 4. Copie du code (SoC)
 COPY src/ ./src/
 COPY .env .

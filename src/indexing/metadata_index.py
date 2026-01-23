@@ -2,196 +2,102 @@
 import sqlite3
 import json
 import os
-import shutil
-from pathlib import Path
 import config
 from utils.logger import setup_logger
-import psutil
 
 logger = setup_logger("MetadataIndex")
 
 def get_db_connection():
+    """Crée une connexion optimisée pour l'ingestion massive."""
     conn = sqlite3.connect(config.METADATA_DB_PATH)
-    conn.row_factory = sqlite3.Row 
-    
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute(f"PRAGMA cache_size={config.DYNAMIC_CACHE_SIZE}")
-    
+    # Optimisations PRAGMA pour la vitesse d'écriture
+    conn.execute(f"PRAGMA cache_size = {config.DYNAMIC_CACHE_SIZE}")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    os.makedirs(config.COMPUTED_DIR, exist_ok=True)
-    conn = get_db_connection() 
-    cursor = conn.cursor()
-    
-    # Mode WAL : vital pour le parallélisme Ingestion/Recherche
-    cursor.execute("PRAGMA journal_mode=WAL")
-     
-    cursor.execute('''
+    conn = get_db_connection()
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS metadata (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            local_id INTEGER,
-            domain TEXT,
+            id INTEGER PRIMARY KEY,
             source TEXT,
-            file_hash TEXT UNIQUE,  
-            type TEXT,
-            label TEXT,
-            domain_score REAL,
-            raw_data TEXT,
-            snippet TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            file_hash TEXT UNIQUE,
+            domain TEXT,
+            content TEXT,
+            extra_json TEXT
         )
     ''')
-
-    # Indexation pour des recherches instantanées sur 80 Go
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_label ON metadata (label)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_retrieval ON metadata (domain, local_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_source ON metadata (source)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_hash ON metadata (file_hash)')
-    
     conn.commit()
     conn.close()
+
+def clear_metadata():
+    if os.path.exists(config.METADATA_DB_PATH):
+        try:
+            os.remove(config.METADATA_DB_PATH)
+        except OSError:
+            pass 
+    init_db()
+    logger.info("Base de données SQLite réinitialisée.")
+
+def store_metadata_batch(metadata_list):
+    """
+    Insère une liste de métadonnées en une seule transaction SQL.
+    Crucial pour la performance (Batch Insert).
+    """
+    if not metadata_list: return
+    
+    conn = get_db_connection()
+    try:
+        # Préparation des tuples pour executemany
+        data_to_insert = [
+            (
+                m['id'],
+                m.get('source'),
+                m.get('file_hash'),
+                m.get('domain'),
+                m.get('content', ''),
+                json.dumps(m.get('extra', {}))
+            )
+            for m in metadata_list
+        ]
+        
+        conn.executemany('''
+            INSERT OR REPLACE INTO metadata (id, source, file_hash, domain, content, extra_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', data_to_insert)
+        
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Erreur SQL Batch : {e}")
+    finally:
+        conn.close()
+
+def check_file_status(file_hash, current_path):
+    conn = get_db_connection()
+    try:
+        row = conn.execute('SELECT source FROM metadata WHERE file_hash = ?', (file_hash,)).fetchone()
+        if not row: return 'new'
+        return 'exists' if row['source'] == str(current_path) else 'moved'
+    finally:
+        conn.close()
+
+def update_file_source(file_hash, new_path):
+    conn = get_db_connection()
+    try:
+        conn.execute('UPDATE metadata SET source = ? WHERE file_hash = ?', (str(new_path), file_hash))
+        conn.commit()
+    finally:
+        conn.close()
 
 def load_metadata_from_disk():
     init_db()
 
-def store_metadata_batch(entries_with_domains):
-    if not entries_with_domains:
-        return []
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    ids_mapping = []
-    domain_counts = {}
-
-    try:
-        for entry, domain in entries_with_domains:
-            if domain not in domain_counts:
-                cursor.execute("SELECT COUNT(*) FROM metadata WHERE domain = ?", (domain,))
-                domain_counts[domain] = cursor.fetchone()[0]
-            
-            local_id = domain_counts[domain]
-            raw_data_str = json.dumps(entry["raw_data"], ensure_ascii=False) if entry.get("raw_data") else None
-
-            try:
-                cursor.execute('''
-                    INSERT INTO metadata (
-                        local_id, domain, source, file_hash, type, 
-                        label, domain_score, raw_data, snippet
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    local_id, domain, entry.get("source", ""),
-                    entry.get("file_hash", ""), entry.get("type", "unknown"),
-                    entry.get("label", "unknown"), entry.get("domain_score", 0.0),
-                    raw_data_str, entry.get("snippet", "")
-                ))
-                ids_mapping.append(local_id)
-                domain_counts[domain] += 1 
-            except sqlite3.IntegrityError:
-                ids_mapping.append(None)
-
-        conn.commit()
-        return ids_mapping
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur lors de l'insertion batch SQL : {e}")
-        return [None] * len(entries_with_domains)
-    finally:
-        conn.close()
-
-def get_metadata_by_id(doc_id, domain):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM metadata WHERE local_id = ? AND domain = ?", (doc_id, domain))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        data = dict(row)
-        if data["raw_data"]:
-            data["raw_data"] = json.loads(data["raw_data"])
-        return data
-    return None
-
 def get_all_metadata():
     conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT source, file_hash FROM metadata")
-        rows = cursor.fetchall()
-        return [{"source": row["source"], "file_hash": row["file_hash"]} for row in rows]
-    except sqlite3.OperationalError:
-        return []
+        rows = conn.execute('SELECT * FROM metadata').fetchall()
+        return rows
     finally:
         conn.close()
-
-def clear_metadata():
-    db_path = config.METADATA_DB_PATH
-    if os.path.exists(db_path):
-        try:
-            os.remove(db_path)
-            logger.info("Base de données SQLite supprimée.")
-        except PermissionError:
-            logger.warning("Impossible de supprimer la DB (fichier verrouillé).")
-            
-    if os.path.exists(config.METADATA_DIR) and config.METADATA_DIR.is_dir():
-         shutil.rmtree(config.METADATA_DIR, ignore_errors=True)
-         
-    init_db()
-    
-def get_metadata_by_label(label, domain=None, limit=10):
-    """
-    Recherche transversale : récupère tous les documents liés à un label.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    query = "SELECT * FROM metadata WHERE label = ?"
-    params = [label]
-    
-    if domain:
-        query += " AND domain = ?"
-        params.append(domain)
-        
-    query += " LIMIT ?"
-    params.append(limit)
-    
-    try:
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        results = []
-        for row in rows:
-            data = dict(row)
-            if data["raw_data"]:
-                data["raw_data"] = json.loads(data["raw_data"])
-            results.append(data)
-        return results
-    finally:
-        conn.close()   
-        
-def check_file_status(file_hash, source_path):
-    """
-    Détermine le statut d'un fichier en base.
-    Retourne: 'exists' (inchangé), 'moved' (même hash, nouveau chemin), 'new' (inconnu).
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # On cherche d'abord par Hash (unique)
-    cursor.execute("SELECT source FROM metadata WHERE file_hash = ?", (file_hash,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        if row['source'] == source_path:
-            return 'exists'
-        return 'moved'
-    return 'new'
-
-def update_file_source(file_hash, new_source):
-    """Met à jour le chemin d'un fichier déplacé."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE metadata SET source = ? WHERE file_hash = ?", (new_source, file_hash))
-    conn.commit()
-    conn.close()

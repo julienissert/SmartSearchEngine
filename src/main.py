@@ -1,56 +1,50 @@
 # src/main.py
 import sys
-import argparse
-import uvicorn
-from pathlib import Path
+import os
+import multiprocessing
 
-# --- CONFIGURATION DES CHEMINS ---
-# On récupère le chemin absolu du dossier 'src'
-SRC_DIR = Path(__file__).resolve().parent
-# On récupère le chemin de la racine du projet (au-dessus de 'src')
-ROOT_DIR = SRC_DIR.parent
+# --- CORRECTIF CRITIQUE GPU ---
+# Force les workers à démarrer "à neuf" (Spawn) au lieu de cloner le parent (Fork).
+# Cela empêche les workers d'hériter du contexte CUDA et de saturer la VRAM.
+if __name__ == "__main__":
+    try:
+        multiprocessing.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass
 
-# On ajoute les DEUX dossiers au path pour supporter tous les styles d'imports
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-# Maintenant, 'import config' ET 'from src import config' fonctionneront
 from utils.environment import check_environment
 from utils.logger import setup_logger
 
-logger = setup_logger("Orchestrator")
+logger = setup_logger("Main")
 
 def main():
-    check_environment() #
+    if len(sys.argv) < 2:
+        print("Usage: python src/main.py [ingest|watch|serve] [options]")
+        sys.exit(1)
 
-    parser = argparse.ArgumentParser(description="SmartSearchEngine CLI")
-    subparsers = parser.add_subparsers(dest="command", help="Commandes")
+    command = sys.argv[1]
 
-    # Ingest
-    ingest_parser = subparsers.add_parser("ingest", help="Lancer l'ingestion")
-    ingest_parser.add_argument("-m", "--mode", choices=['r', 'c'], help="r: reset, c: compléter")
+    # Vérification environnementale avant tout
+    if not check_environment():
+        logger.error("Environnement invalide. Arrêt.")
+        sys.exit(1)
 
-    # Serve
-    subparsers.add_parser("serve", help="Lancer l'API")
-
-    # Watch
-    subparsers.add_parser("watch", help="Lancer le Watcher")
-
-    args = parser.parse_args()
-
-    if args.command == "ingest":
+    if command == "ingest":
         from ingestion.main import run_ingestion_logic
-        run_ingestion_logic(mode=args.mode)
-    elif args.command == "serve":
-        logger.info("Lancement Search API")
-        uvicorn.run("search.main:app", host="0.0.0.0", port=8000, reload=True)
-    elif args.command == "watch":
-        from utils.watcher import start_watching
-        start_watching()
+        run_ingestion_logic()
+    
+    elif command == "watch":
+        from utils.watcher import start_watcher
+        start_watcher()
+        
+    elif command == "serve":
+        import uvicorn
+        # Lancement de l'API
+        uvicorn.run("search.main:app", host="0.0.0.0", port=8000, reload=False)
+        
     else:
-        parser.print_help()
+        logger.error(f"Commande inconnue: {command}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,7 @@ x-common-config: &common-config
     - OCR_LANG=latin
     - PYTHONPATH=/app
     - METADATA_DB_PATH=/app/computed-data/metadata/metadata.db
+    - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
   volumes:
     - ./raw-datasets:/app/raw-datasets
     - ./computed-data:/app/computed-data
