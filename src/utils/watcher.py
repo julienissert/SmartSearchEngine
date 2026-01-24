@@ -19,7 +19,6 @@ class DatasetHandler(FileSystemEventHandler):
     def process_event(self, event):
         """Ignore les dossiers et les fichiers cachés (commençant par .)."""
         if not event.is_directory:
-            # Extraction du nom de fichier pour vérifier s'il est caché
             filename = event.src_path.replace("\\", "/").split("/")[-1]
             if filename.startswith("."):
                 return
@@ -38,7 +37,6 @@ class DatasetHandler(FileSystemEventHandler):
 
     def run_ingestion(self):
         """
-        Détermine intelligemment le mode d'ingestion et lance le processus.
         Mode 'r' (reset) si la base est vide, sinon 'c' (compléter).
         """
         mode = "c"
@@ -52,9 +50,6 @@ class DatasetHandler(FileSystemEventHandler):
         logger.info(f"Déclenchement automatique de l'ingestion (Mode: {mode})")
         
         try:
-            # CORRECTIF : Le répertoire de travail (cwd) doit être config.BASE_DIR.
-            # config.BASE_DIR est la racine du projet contenant le dossier 'src'.
-            # Utiliser '.parent' faisait chercher le module 'src' un niveau trop haut.
             subprocess.run(
                 [sys.executable, "-m", "src.main", "ingest", "-m", mode],
                 check=True,
@@ -72,7 +67,6 @@ def start_watching():
         logger.error(f"Dossier à surveiller introuvable : {config.DATASET_DIR}")
         return
 
-    # Utilisation d'un délai de 10 secondes pour laisser le temps aux fichiers d'être copiés
     handler = DatasetHandler(debounce_seconds=10)
     observer = Observer()
     observer.schedule(handler, str(config.DATASET_DIR), recursive=True)
@@ -82,7 +76,6 @@ def start_watching():
 
     try:
         while True:
-            # Mécanisme de Debouncing (anti-rebond)
             if handler.pending_event:
                 if (time.time() - handler.last_trigger_time) > handler.debounce_seconds:
                     handler.run_ingestion()

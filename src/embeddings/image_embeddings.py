@@ -14,9 +14,7 @@ def get_model():
         current_proc = multiprocessing.current_process().name
         is_worker = any(x in current_proc for x in ["Process-", "ForkPoolWorker", "engine_ingest"])
         device = "cpu" if is_worker else config.DEVICE
-        
-        print(f"Chargement CLIP IMAGE sur {device} (Process: {current_proc})")
-        
+                
         _model = CLIPModel.from_pretrained(config.IMAGE_MODEL_NAME).to(device)
         _processor = CLIPProcessor.from_pretrained(config.IMAGE_MODEL_NAME)
         _model.eval()
@@ -39,6 +37,5 @@ def embed_image_batch(pil_images):
 def embed_image(pil_image):
     if pil_image is None:
         return np.zeros(config.EMBEDDING_DIM)
-    # Attention : embed_image_batch retourne une liste, on prend le premier élément
     res = embed_image_batch([pil_image])
     return res[0] if len(res) > 0 else np.zeros(config.EMBEDDING_DIM)

@@ -1,66 +1,99 @@
 # src/utils/domain_detector.py
-from src import config
 import numpy as np
+import os
+from PIL import Image
+from src import config  
 from src.embeddings.text_embeddings import embed_text
 from src.embeddings.image_embeddings import embed_image
 
-_domain_prompts_embeddings = None
+# On garde tes templates pro
+PROMPT_TEMPLATES = [
+    "A photo of {}.", "Category: {}.", "This is related to {}.",
+    "A list of {}.", "Technical data about {}."
+]
 
-def get_domain_embeddings():
-    global _domain_prompts_embeddings
-    if _domain_prompts_embeddings is None:
-        prompts = [
-            "medical document, health, doctor, prescription",
-            "food document, recipe, nutrition, restaurant"
-        ]
-        # Ceci va trigger le chargement GPU (uniquement dans le MainProcess)
-        _domain_prompts_embeddings = [embed_text(p) for p in prompts]
-    return _domain_prompts_embeddings
+DOMAIN_VECTORS_AUDIT = {}
 
-# src/utils/domain_detector.py
-
-def detect_domain(text, pil_image=None, precomputed_vector=None):
-    """
-    Détecte le domaine d'un document (médical, alimentaire, etc.).
-    """
-    # --- ÉTAPE 1 : OBTENTION DU VECTEUR ---
-    if precomputed_vector is not None:
-        # On utilise le vecteur déjà calculé par le batch principal
-        final_doc_vector = precomputed_vector
-    else:
-        # Sécurité : Si appelé hors batch, on calcule manuellement
-        safe_text = str(text) if text else ""
-        doc_vectors = []
-        
-        if len(safe_text.strip()) > 5:
-            doc_vectors.append(embed_text(safe_text))
-            
-        if pil_image is not None:
-            doc_vectors.append(embed_image(pil_image))
-        
-        if not doc_vectors: 
-            return "unknown"
-            
-        final_doc_vector = np.mean(doc_vectors, axis=0)
-
-    # --- ÉTAPE 2 : COMPARAISON SÉMANTIQUE ---
-    domain_vectors = get_domain_embeddings()
-    similarities = []
+def init_domain_references():
+    """Initialise les centroïdes de domaine via les templates."""
+    global DOMAIN_VECTORS_AUDIT
+    if DOMAIN_VECTORS_AUDIT: return 
     
-    for dv in domain_vectors:
-        # Calcul de la similarité cosinus avec sécurité division par zéro
-        norm_product = (np.linalg.norm(final_doc_vector) * np.linalg.norm(dv))
-        if norm_product == 0:
-            similarities.append(0)
-        else:
-            sim = np.dot(final_doc_vector, dv) / norm_product
-            similarities.append(sim)
+    for domain in config.TARGET_DOMAINS:
+        # On crée une empreinte large (Centroïde) pour chaque domaine
+        prompts = [template.format(domain) for template in PROMPT_TEMPLATES]
+        embeddings = [embed_text(p) for p in prompts]
+        vec_audit = np.mean(embeddings, axis=0)
+        DOMAIN_VECTORS_AUDIT[domain] = vec_audit / np.linalg.norm(vec_audit)
 
-    # --- ÉTAPE 3 : DÉCISION ---
-    best_idx = np.argmax(similarities)
+def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str = None, 
+                  content_dict: dict = None, precomputed_vector: np.ndarray = None):
+    """
+    Détecteur de domaine pro à 3 couches.
+    Optimisé pour capturer le signal sémantique des datasets complexes.
+    """
+    init_domain_references()
     
-    # On vérifie si le score dépasse le seuil de confiance configuré
-    if similarities[best_idx] < config.SEMANTIC_THRESHOLD:
-        return "unknown"
-        
-    return config.TARGET_DOMAINS[best_idx]
+    # --- PRÉPARATION : Création du vecteur de contexte (Chemin + Structure) ---
+    context_vec = None
+    context_parts = []
+    
+    if filepath:
+        # On extrait tout le texte utile du chemin
+        path_text = os.path.basename(filepath).replace("_", " ").replace("-", " ")
+        context_parts.append(path_text)
+    
+    if isinstance(content_dict, dict):
+        # On extrait toutes les clés (le schéma du dataset)
+        schema_text = " ".join(content_dict.keys()).replace("_", " ")
+        context_parts.append(schema_text)
+
+    if context_parts:
+        # On crée un vecteur global qui représente le "sens" de la structure
+        full_context = " ".join(context_parts)
+        raw_context_vec = embed_text(full_context)
+        context_vec = raw_context_vec / np.linalg.norm(raw_context_vec)
+
+    # --- ÉTAPE A : CALCUL DES SCORES PAR COUCHE ---
+    
+    # 1. Score Structurel (Couche 0 & 1 combinées par signal cumulé)
+    struct_scores = {d: 0.0 for d in config.TARGET_DOMAINS}
+    if context_vec is not None:
+        struct_scores = {d: float(np.dot(context_vec, v)) for d, v in DOMAIN_VECTORS_AUDIT.items()}
+
+    # 2. Score IA / CLIP (Couche 2)
+    ai_scores = {d: 0.0 for d in config.TARGET_DOMAINS}
+    doc_emb = precomputed_vector
+    if doc_emb is None:
+        doc_emb = embed_image(pil_image) if pil_image else embed_text(text) if text else None
+    
+    if doc_emb is not None:
+        norm_vec = doc_emb / np.linalg.norm(doc_emb)
+        ai_scores = {d: float(np.dot(norm_vec, v)) for d, v in DOMAIN_VECTORS_AUDIT.items()}
+
+    # --- ÉTAPE B : LOGIQUE DE DÉCISION HIÉRARCHIQUE ---
+
+    # PRIORITÉ 1 : Si la structure (clés CSV/nom de fichier) est claire (> 0.50)
+    best_struct = max(struct_scores, key=struct_scores.get)
+    if struct_scores[best_struct] > 0.50:
+        return best_struct, struct_scores, "structural_context_forced"
+
+    # PRIORITÉ 2 : Fusion sémantique (AI + Structure)
+    final_probs = {}
+    for d in config.TARGET_DOMAINS:
+        combined_score = (struct_scores[d] * 0.6) + (ai_scores[d] * 0.4)
+        final_probs[d] = combined_score
+
+    # Softmax léger pour l'exportation des probabilités (température=10.0)
+    logits = np.array(list(final_probs.values())) * 10.0
+    exp_logits = np.exp(logits - np.max(logits))
+    probs_values = exp_logits / np.sum(exp_logits)
+    ai_probabilities = {k: float(p) for k, p in zip(final_probs.keys(), probs_values)}
+
+    best_final = max(final_probs, key=final_probs.get)
+    
+    # SÉCURITÉ : Seuil de rejet
+    if final_probs[best_final] < 0.25:
+        return "unknown", ai_probabilities, "low_confidence_rejection"
+
+    return best_final, ai_probabilities, "semantic_fusion"

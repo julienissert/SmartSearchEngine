@@ -40,15 +40,15 @@ class ResourceManager:
 
     def get_max_workers(self):
         # On réduit légèrement pour laisser respirer le système
-        safe_ram = max(0, self.total_ram - (6 * 1024 * 1024 * 1024))
-        ram_limit = int((safe_ram * 0.8) / (1200 * 1024 * 1024))    
+        safe_ram = max(0, self.total_ram - (8 * 1024 * 1024 * 1024))
+        ram_limit = int((safe_ram * 0.75) / (1000 * 1024 * 1024))    
             
-        if self.device == "cpu":
-            cpu_limit = max(1, int(self.cpu_count * 0.4)) #à valider 40% OCR seulement 
+        if self.device != "cpu":
+            cpu_limit = self.cpu_count 
         else:
-            cpu_limit = self.cpu_count - 1
+            cpu_limit = int(self.cpu_count * 0.6) 
             
-        return max(1, min(cpu_limit, ram_limit, 24))
+        return max(1, min(cpu_limit, ram_limit, 32))
 
     def get_torch_threads(self):
         if self.device != "cpu": return 1

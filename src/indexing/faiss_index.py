@@ -8,86 +8,81 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("FaissIndex")
 
-# Stockage global des index par domaine
+# Stockage global des index et compteurs par domaine
 _indexes = {}
 _id_counters = {}
 
 def get_index(domain):
-    """Récupère ou crée l'index FAISS pour un domaine donné."""
+    """Récupère ou crée l'index HNSW pour un domaine donné."""
+    global _indexes, _id_counters
     if domain not in _indexes:
-        # HNSW pour la vitesse de recherche approximative
-        M, ef_c, ef_s = config.FAISS_HNSW_M, config.FAISS_HNSW_EF_CONSTRUCTION, config.FAISS_HNSW_EF_SEARCH
+        # Configuration HNSW depuis config.py pour l'échelle 80 Go
+        M = config.FAISS_HNSW_M
         index = faiss.IndexHNSWFlat(config.EMBEDDING_DIM, M)
-        index.hnsw.efConstruction = ef_c
-        index.hnsw.efSearch = ef_s
+        index.hnsw.efConstruction = config.FAISS_HNSW_EF_CONSTRUCTION
+        index.hnsw.efSearch = config.FAISS_HNSW_EF_SEARCH
         
         _indexes[domain] = index
-        _id_counters[domain] = 0
+        # Initialise le compteur si pas chargé depuis le disque
+        if domain not in _id_counters:
+            _id_counters[domain] = 0
+            
+        logger.info(f"Index HNSW [{domain}] initialisé (M={M}, efC={index.hnsw.efConstruction})")
     return _indexes[domain]
 
 def add_to_index(vector, domain):
     """
-    Ajoute un vecteur à l'index et retourne son ID unique.
-    CORRECTION : Retourne un int natif, pas un numpy type.
+    Ajoute un vecteur et retourne son local_id (sa position exacte).
     """
-    if domain == "unknown":
+    if domain == "unknown" or vector is None:
         return -1
 
     index = get_index(domain)
     
-    # Normalisation L2 (nécessaire pour similarité cosinus avec FAISS)
-    vector = vector.astype('float32')
-    faiss.normalize_L2(vector.reshape(1, -1))
+    # ÉLITE : Normalisation L2 impérative pour la précision CLIP
+    v = vector.astype('float32').reshape(1, -1)
+    faiss.normalize_L2(v)
     
-    # Ajout à l'index
-    index.add(vector.reshape(1, -1))
+    local_id = index.ntotal
+    index.add(v)
     
-    # Gestion de l'ID
-    doc_id = _id_counters[domain]
-    _id_counters[domain] += 1
+    # Mise à jour du compteur pour la persistance
+    _id_counters[domain] = index.ntotal
     
-    # On combine le domaine et l'ID pour avoir une clé unique globale si nécessaire
-    # Mais ici on retourne l'ID local simple pour le stockage metadata
-    # (Il faudra gérer le mapping ID <-> Domaine si on veut retrouver le doc)
-    
-    # ASTUCE : Pour l'unicité globale dans SQLite, on peut encoder le domaine dans l'ID
-    # Exemple : ID = (hash(domain) << 32) | doc_id
-    # Pour l'instant, restons simple : on retourne un grand entier unique
-    # On utilise un préfixe basé sur le domaine pour éviter les collisions dans la DB unique
-    domain_prefix = abs(hash(domain)) % 1000000
-    global_id = int(f"{domain_prefix}{doc_id}")
-    
-    return int(global_id) # Force le type int Python
+    return int(local_id)
 
 def save_all_indexes():
-    """Sauvegarde tous les index sur disque."""
+    os.makedirs(config.FAISS_INDEX_DIR, exist_ok=True)
     for domain, index in _indexes.items():
         path = config.FAISS_INDEX_DIR / f"{domain}.index"
         faiss.write_index(index, str(path))
     
-    # Sauvegarde des compteurs
+    # Sauvegarde des compteurs pour conserver la cohérence après reboot
     with open(config.FAISS_INDEX_DIR / "counters.pkl", "wb") as f:
         pickle.dump(_id_counters, f)
+    logger.info("Tous les index et compteurs FAISS sauvegardés.")
 
 def load_all_indexes():
-    """Charge les index depuis le disque."""
     global _indexes, _id_counters
     if not config.FAISS_INDEX_DIR.exists(): return
 
-    # Chargement compteurs
+    # 1. Chargement des compteurs
     counter_path = config.FAISS_INDEX_DIR / "counters.pkl"
     if counter_path.exists():
         with open(counter_path, "rb") as f:
             _id_counters = pickle.load(f)
 
-    # Chargement index
-    for f in os.listdir(config.FAISS_INDEX_DIR):
-        if f.endswith(".index"):
-            domain = f.replace(".index", "")
-            _indexes[domain] = faiss.read_index(str(config.FAISS_INDEX_DIR / f))
+    # 2. Chargement des fichiers .index
+    for f_name in os.listdir(config.FAISS_INDEX_DIR):
+        if f_name.endswith(".index"):
+            domain = f_name.replace(".index", "")
+            path = config.FAISS_INDEX_DIR / f_name
+            _indexes[domain] = faiss.read_index(str(path))
+            _indexes[domain].hnsw.efSearch = config.FAISS_HNSW_EF_SEARCH
+    logger.info(f"Index chargés : {list(_indexes.keys())}")
 
 def reset_all_indexes():
-    """Vide la mémoire et supprime les fichiers."""
+    """Réinitialisation totale RAM + Disque."""
     global _indexes, _id_counters
     _indexes = {}
     _id_counters = {}
@@ -95,4 +90,5 @@ def reset_all_indexes():
     import shutil
     if config.FAISS_INDEX_DIR.exists():
         shutil.rmtree(config.FAISS_INDEX_DIR)
-    config.FAISS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    os.makedirs(config.FAISS_INDEX_DIR, exist_ok=True)
+    logger.info("Tous les index FAISS réinitialisés.")
