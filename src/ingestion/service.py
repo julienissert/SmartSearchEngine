@@ -5,7 +5,7 @@ import concurrent.futures
 import psutil
 import torch 
 from tqdm import tqdm
-
+from src.utils.spinner import TqdmHeartbeat
 from src import config
 from src.ingestion.folder_scanner import scan_folder
 from src.ingestion.dispatcher import dispatch_loader
@@ -90,9 +90,8 @@ class IngestionService:
 
         total_indexed = 0
         stream_buffer = []
-
-        # 3. Streaming Ingestion avec protection matérielle
-        try:
+        
+        try: # BLOC GLOBAL (Muscles & Cerveau)
             with concurrent.futures.ProcessPoolExecutor(
                 max_workers=config.MAX_WORKERS,
                 initializer=_init_ocr_worker
@@ -100,34 +99,40 @@ class IngestionService:
                 
                 results_gen = executor.map(_worker_load_file, files_info, chunksize=config.INGESTION_CHUNKSIZE)
                 pbar = tqdm(total=len(files_info), desc=" Streaming Ingestion")
-                
-                for res in results_gen:
-                    if res: stream_buffer.extend(res)
-                    
-                    # ---  BATCHING STRICT (Protection VRAM RTX) ---
-                    while len(stream_buffer) >= config.BATCH_SIZE:
-                        current_batch = stream_buffer[:config.BATCH_SIZE]
-                        stream_buffer = stream_buffer[config.BATCH_SIZE:]
+                heartbeat = TqdmHeartbeat(pbar, "Streaming Ingestion")
+                heartbeat.start()
+
+                try: # BLOC INTERNE (Sécurité UI)
+                    for res in results_gen:
+                        if res: stream_buffer.extend(res)
                         
-                        total_indexed += process_batch(current_batch, valid_labels)
-                        
-                        if config.DEVICE == "cuda":
-                            torch.cuda.empty_cache() 
+                        while len(stream_buffer) >= config.BATCH_SIZE:
+                            current_batch = stream_buffer[:config.BATCH_SIZE]
+                            stream_buffer = stream_buffer[config.BATCH_SIZE:]
+                            total_indexed += process_batch(current_batch, valid_labels)
                             
-                        pbar.set_postfix({"RAM": f"{psutil.virtual_memory().percent}%", "Vectors": total_indexed})
-                    
-                    pbar.update(1)
+                            if config.DEVICE == "cuda":
+                                torch.cuda.empty_cache() 
+                            pbar.set_postfix({"RAM": f"{psutil.virtual_memory().percent}%", "Vectors": total_indexed})
+                        
+                        pbar.update(1)
 
-                if stream_buffer:
-                    total_indexed += process_batch(stream_buffer, valid_labels)
+                    if stream_buffer:
+                        total_indexed += process_batch(stream_buffer, valid_labels)
 
-                pbar.close()
+                finally:
+                    # On arrête le spinner et la barre de progression quoi qu'il arrive
+                    heartbeat.stop()
+                    pbar.close()
 
         except KeyboardInterrupt:
-            logger.warning("\nInterruption manuelle.")
+            logger.warning("\nInterruption manuelle par l'utilisateur.")
+        except Exception as e:
+            logger.error(f"Erreur critique durant le streaming : {e}")
         finally:
+            # SAUVEGARDE FINALE : On s'assure de ne pas perdre le travail fait
             if total_indexed > 0:
                 save_all_indexes()
-                logger.info(f"Terminé : {total_indexed} nouveaux documents indexés.")
+                logger.info(f"Sauvegarde effectuée : {total_indexed} documents indexés.")
             
         return total_indexed, len(files_info)

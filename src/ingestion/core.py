@@ -67,11 +67,39 @@ def process_batch(batch_docs, valid_labels):
             logger.warning(f"Fichier ignoré car corrompu : {doc.get('source')} | Erreur: {e}")
             continue
 
-    # --- ÉTAPE 3 : SQL Batch ---
+    # --- ÉTAPE 3 : SQL Batch & NETTOYAGE AGRESSIF ---
     if metadata_buffer:
         store_metadata_batch(metadata_buffer)
 
-    return len(metadata_buffer)
+    # 1. Capturer le nombre RÉEL d'insertions AVANT le nettoyage
+    indexed_count = len(metadata_buffer)
+
+    # 2. Libération CRITIQUE de la RAM (PIL Images)
+    # On ferme explicitement chaque image pour libérer les pixels bruts
+    for doc in batch_docs:
+        if 'image' in doc and doc['image'] is not None:
+            try:
+                doc['image'].close() 
+            except: pass
+            doc['image'] = None
+
+    # 3. Nettoyage des listes de support
+    batch_docs.clear()
+    metadata_buffer.clear()
+    texts.clear()
+    images.clear()
+    
+    # 4. Forcer le Garbage Collector de Python
+    import gc
+    gc.collect()
+    
+    # 5. Vidage du cache CUDA (si GPU)
+    if config.DEVICE == "cuda":
+        import torch
+        torch.cuda.empty_cache()
+
+    # On renvoie le vrai nombre d'insertions (pour tes logs)
+    return indexed_count
 
 def _prepare_document_metadata(doc, vector, valid_labels):
     source_path = doc["source"]
