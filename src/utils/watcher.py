@@ -41,9 +41,10 @@ class DatasetHandler(FileSystemEventHandler):
         """
         mode = "c"
         # Vérification si la base de métadonnées existe et n'est pas vide
-        metadata_exists = config.METADATA_DIR.exists() and any(config.METADATA_DIR.iterdir())
+        db_path = config.LANCEDB_URI
+        table_folder = db_path / f"{config.TABLE_NAME}.lance"        
         
-        if not metadata_exists:
+        if not db_path.exists() or not table_folder.exists():
             mode = "r"
             logger.info("Base vide détectée -> Mode Réinitialisation (r)")
         

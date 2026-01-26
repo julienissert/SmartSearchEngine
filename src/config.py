@@ -71,18 +71,6 @@ class ResourceManager:
     
     def get_chunksize(self):
         return 1
-        #return max(5, min(50, 300 // self.get_max_workers()))
-
-    def get_sql_cache_kb(self):
-        budget = min(1024 * 1024 * 1024, int(self.total_ram * 0.05))
-        return -int(budget / 1024)
-        
-    def get_hnsw_params(self):
-        ram_gb = self.total_ram / (1024**3)
-        M = 48 if ram_gb >= 64 else 32
-        ef_c = 40 
-        ef_s = 64
-        return M, ef_c, ef_s
 
 res = ResourceManager()
 
@@ -90,8 +78,6 @@ res = ResourceManager()
 MAX_WORKERS = res.get_max_workers()
 BATCH_SIZE = res.get_batch_size()
 INGESTION_CHUNKSIZE = res.get_chunksize()
-DYNAMIC_CACHE_SIZE = res.get_sql_cache_kb()
-FAISS_HNSW_M, FAISS_HNSW_EF_CONSTRUCTION, FAISS_HNSW_EF_SEARCH = res.get_hnsw_params()
 
 OCR_FORCE_CPU = True
 LABEL_BATCH_SIZE = 1000
@@ -106,11 +92,10 @@ OCR_LANG = os.getenv("OCR_LANG", "latin")
 
 DATASET_DIR = BASE_DIR / "raw-datasets"
 COMPUTED_DIR = BASE_DIR / "computed-data"
-FAISS_INDEX_DIR = COMPUTED_DIR / "indexes"
-METADATA_DIR = COMPUTED_DIR / "metadata"
-METADATA_DB_PATH = COMPUTED_DIR / "metadata.db"
+LANCEDB_URI = COMPUTED_DIR / "lancedb_store"
+TABLE_NAME = "multimodal_catalog"
 
-for path in [COMPUTED_DIR, FAISS_INDEX_DIR, METADATA_DIR]:
+for path in [COMPUTED_DIR, LANCEDB_URI]:
     path.mkdir(parents=True, exist_ok=True)
 
 TARGET_DOMAINS = ["food", "medical"]

@@ -10,14 +10,13 @@ from src import config
 from src.ingestion.folder_scanner import scan_folder
 from src.ingestion.dispatcher import dispatch_loader
 from src.ingestion.core import process_batch
-from src.indexing.faiss_index import reset_all_indexes, load_all_indexes, save_all_indexes
-from src.indexing.metadata_index import (
-    init_db, clear_metadata, check_file_status, update_file_source
+from src.indexing.vector_store import (
+    init_tables, reset_store, check_file_status, 
+    update_file_source, create_vector_index
 )
 from src.utils.label_detector import analyze_dataset_structure
 from src.utils.preprocessing import calculate_fast_hash
 from src.utils.logger import setup_logger
-
 logger = setup_logger("IngestionService")
 
 def _init_ocr_worker():
@@ -35,6 +34,8 @@ def _worker_load_file(args):
         
         for i, doc in enumerate(docs):
             doc['source'] = str(file_path)
+            if 'extra' not in doc:
+                doc['extra'] = {}
             if len(docs) > 1:
                 doc['file_hash'] = hashlib.md5(f"{file_hash}_{i}".encode()).hexdigest()
             else:
@@ -46,39 +47,41 @@ def _worker_load_file(args):
 class IngestionService:
     @staticmethod
     def get_files_to_ingest(mode='r'):
-        """RESTAURÉ : Logique de Fast-Check pour l'ingestion incrémentale."""
+        """Version Elite : Fast-Check en mémoire pour une vitesse foudroyante."""
         all_paths = scan_folder(config.DATASET_DIR)
+        
         if mode == 'r':
             return [(f, calculate_fast_hash(f)) for f in all_paths]
 
+        from src.indexing.vector_store import get_all_indexed_hashes
+        indexed_hashes = get_all_indexed_hashes() 
+        
         to_process = []
-        skipped, moved = 0, 0
+        skipped = 0
+        
         for f in tqdm(all_paths, desc="Fast-Check Incremental"):
             f_hash = calculate_fast_hash(f)
             if not f_hash: continue
             
-            status = check_file_status(f_hash, f)
-            if status == 'exists': skipped += 1
-            elif status == 'moved':
-                update_file_source(f_hash, f)
-                moved += 1
-            else: to_process.append((f, f_hash))
+            # Vérification instantanée en RAM (Set lookup)
+            if f_hash in indexed_hashes:
+                skipped += 1
+            else:
+                to_process.append((f, f_hash))
                 
-        logger.info(f"Fast-Check : {skipped} inchangés, {moved} déplacés, {len(to_process)} à traiter.")
+        logger.info(f"Fast-Check : {skipped} déjà indexés, {len(to_process)} nouveaux à traiter.")
         return to_process
 
     @staticmethod
     def run_workflow(mode='r'):
-        """Orchestre le Workflow : Muscles (Performance) + Cerveau (Sémantique)."""
-        logger.info(f"--- Workflow Démarré (Workers: {config.MAX_WORKERS} | Batch: {config.BATCH_SIZE}) ---")
+        """Orchestre le Workflow de Ingestion à Indexation."""
+        logger.info(f"--- Workflow LanceDB Démarré (Batch: {config.BATCH_SIZE}) ---")
         
-        # 1. Préparation DB
+        # 1. Préparation du Store 
         if mode == 'r':
-            reset_all_indexes()
-            clear_metadata()
+            reset_store()
         else:
-            init_db()
-            load_all_indexes()
+            init_tables()
 
         # 2. Analyse de structure 
         valid_labels = analyze_dataset_structure(config.DATASET_DIR)
@@ -91,7 +94,7 @@ class IngestionService:
         total_indexed = 0
         stream_buffer = []
         
-        try: # BLOC GLOBAL (Muscles & Cerveau)
+        try:
             with concurrent.futures.ProcessPoolExecutor(
                 max_workers=config.MAX_WORKERS,
                 initializer=_init_ocr_worker
@@ -102,7 +105,7 @@ class IngestionService:
                 heartbeat = TqdmHeartbeat(pbar, "Streaming Ingestion")
                 heartbeat.start()
 
-                try: # BLOC INTERNE (Sécurité UI)
+                try:
                     for res in results_gen:
                         if res: stream_buffer.extend(res)
                         
@@ -111,28 +114,30 @@ class IngestionService:
                             stream_buffer = stream_buffer[config.BATCH_SIZE:]
                             total_indexed += process_batch(current_batch, valid_labels)
                             
-                            if config.DEVICE == "cuda":
-                                torch.cuda.empty_cache() 
-                            pbar.set_postfix({"RAM": f"{psutil.virtual_memory().percent}%", "Vectors": total_indexed})
+                            pbar.set_postfix({
+                                "RAM": f"{psutil.virtual_memory().percent}%", 
+                                "Vectors": total_indexed
+                            })
                         
                         pbar.update(1)
 
+                    # Traitement du reliquat
                     if stream_buffer:
                         total_indexed += process_batch(stream_buffer, valid_labels)
 
                 finally:
-                    # On arrête le spinner et la barre de progression quoi qu'il arrive
                     heartbeat.stop()
                     pbar.close()
 
         except KeyboardInterrupt:
-            logger.warning("\nInterruption manuelle par l'utilisateur.")
+            logger.warning("\nInterruption manuelle.")
         except Exception as e:
             logger.error(f"Erreur critique durant le streaming : {e}")
         finally:
-            # SAUVEGARDE FINALE : On s'assure de ne pas perdre le travail fait
+            # 3. ÉTAPE FINALE ÉLITE : Création de l'index disque
             if total_indexed > 0:
-                save_all_indexes()
-                logger.info(f"Sauvegarde effectuée : {total_indexed} documents indexés.")
+                logger.info("Optimisation de l'index vectoriel sur disque...")
+                create_vector_index()
+                logger.info(f"Workflow terminé : {total_indexed} documents synchronisés.")
             
         return total_indexed, len(files_info)

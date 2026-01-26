@@ -10,16 +10,20 @@ class PDFLoader(BaseLoader):
         return extension.lower() in self.get_supported_extensions()
 
     def load(self, path: str, valid_labels=None) -> list:
-        text = ""
+        pages_content = []
         try:
             with fitz.open(path) as doc:
                 for page in doc:
-                    text += page.get_text() + "\n"
+
+                    page_text = str(page.get_text("text"))
+                    pages_content.append(page_text)
+            
+            full_text = "\n".join(pages_content)
             
             return [{
                 "source": path,
                 "type": "pdf",
-                "content": text
+                "content": full_text
             }]
         except Exception:
             return []

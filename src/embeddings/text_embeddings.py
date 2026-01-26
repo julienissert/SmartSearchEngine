@@ -27,8 +27,16 @@ def embed_text_batch(texts):
     cleans = [clean_text(str(t)) if t is not None else "" for t in texts]
     
     model, tokenizer = get_model()
+    if model is None or tokenizer is None:
+        return []
     
-    inputs = tokenizer(cleans, padding=True, truncation=True, max_length=77, return_tensors="pt").to(model.device)
+    inputs = tokenizer(
+        cleans, 
+        padding=True, 
+        truncation=True, 
+        max_length=77, 
+        return_tensors="pt"
+    ).to(model.device)
     
     with torch.no_grad():
         features = model.get_text_features(**inputs)

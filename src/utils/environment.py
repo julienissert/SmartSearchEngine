@@ -6,7 +6,7 @@ from src.utils.logger import setup_logger
 logger = setup_logger("EnvChecker")
 
 def check_environment():
-    logger.info("Lancement des vérifications de l'environnement...")
+    logger.info("Lancement des vérifications de l'environnement (Architecture LanceDB)...")
     
     # 1. Vérification des dossiers de base
     if not config.DATASET_DIR.exists():
@@ -14,24 +14,28 @@ def check_environment():
         config.DATASET_DIR.mkdir(parents=True, exist_ok=True)
         logger.info("Dossier dataset créé.")
 
-    # 2. Vérification des moteurs IA (Agnostique)
-    try:
-        importlib.import_module("paddleocr")
-        logger.info("Moteur OCR (PaddleOCR) détecté.")
-    except ImportError:
-        logger.error("PaddleOCR n'est pas installé.")
+    # 2. Vérification des moteurs IA & Données
+    required_modules = {
+        "lancedb": "Moteur de stockage VectorStore",
+        "pyarrow": "Gestionnaire de format de données Arrow",
+        "paddleocr": "Moteur OCR (PaddleOCR)",
+        "fitz": "Lecteur PDF (PyMuPDF)"
+    }
 
-    try:
-        importlib.import_module("fitz") 
-        logger.info("Lecteur PDF (PyMuPDF) détecté.")
-    except ImportError:
-        logger.warning("PyMuPDF n'est pas installé.")
+    for module, description in required_modules.items():
+        try:
+            importlib.import_module(module)
+            logger.info(f"{description} détecté.")
+        except ImportError:
+            if module in ["lancedb", "pyarrow"]:
+                logger.error(f"CRITIQUE : {module} n'est pas installé. L'application ne peut pas fonctionner.")
+            else:
+                logger.warning(f" {description} ({module}) n'est pas installé.")
 
-    # 3. Validation de la structure
+
     config.COMPUTED_DIR.mkdir(parents=True, exist_ok=True)
-    config.FAISS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    config.METADATA_DIR.mkdir(parents=True, exist_ok=True) 
+    config.LANCEDB_URI.mkdir(parents=True, exist_ok=True)
     
-    logger.info("Structure de l'application validée.")
+    logger.info(" Structure de l'application validée (LanceDB Store).")
     logger.info(f"Matériel utilisé : {config.DEVICE}")
     return True

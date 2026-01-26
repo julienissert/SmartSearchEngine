@@ -1,39 +1,42 @@
 # src/search/composer.py
-from src import config
-from src.indexing.metadata_index import get_metadata_by_id
+import json
 
 class ResultComposer:
     def build_response(self, matches, ocr_text):
+        """
+        Prend les résultats bruts de LanceDB et les formate proprement.
+        Plus besoin de requêtes SQLite, tout est déjà dans 'matches'.
+        """
         final_results = []
         
         for m in matches:
-            domain = m["domain"]
-            doc_id = m["id"] 
-            
-            # Interrogation directe de SQLite via l'ID
-            data = get_metadata_by_id(doc_id, domain)
-            
-            if not data:
-                continue
-                
             res = {
-                "domain": domain,
-                "label": data.get("label"),
-                "source": data.get("source"),
-                "match_score": m["score"],
-                "origin": m.get("origin", "unknown") 
+                "domain": m["domain"],
+                "label": m["label"],
+                "source": m["source"],
+                "type": m.get("type", "unknown"),
+                "match_score": round(m["score"], 4),
+                "origin": m.get("origin", "hybrid_search")
             }
 
-            # LOGIQUE D'ENRICHISSEMENT
-            if data.get("raw_data"):
-                res["details"] = data.get("raw_data")
-            elif data.get("snippet"):
-                res["details"] = data.get("snippet")
+            # LOGIQUE D'ENRICHISSEMENT (Snippet ou extra)
+            if m.get("snippet"):
+                res["details"] = m["snippet"]
+            
+            if m.get("extra"):
+                try:
+                    if isinstance(m["extra"], str):
+                        res["metadata_extended"] = json.loads(m["extra"])
+                    else:
+                        res["metadata_extended"] = m["extra"]
+                except:
+                    pass
             
             final_results.append(res)
         
         return {
             "query_ocr": ocr_text,
+            "total_count": len(final_results),
             "top_results": final_results
         }
 

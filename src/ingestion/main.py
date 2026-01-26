@@ -8,11 +8,15 @@ logger = setup_logger("IngestionService")
 
 def run_ingestion_logic(mode=None):
     start_time = time.time()
+    
+    # Détection de la table LanceDB
+    table_path = config.LANCEDB_URI / f"{config.TABLE_NAME}.lance"
+    db_exists = table_path.exists()
 
     # Mode interactif si lancé sans argument -m
     if mode is None:
-        if config.METADATA_DIR.exists() and any(config.METADATA_DIR.iterdir()):
-            choice = input("\nBase existante. (R)éinitialiser ou (C)ompléter ? [R/C] : ").lower()
+        if db_exists:
+            choice = input("\nBase LanceDB détectée. (R)éinitialiser ou (C)ompléter ? [R/C] : ").lower()
             mode = 'c' if choice == 'c' else 'r'
         else:
             mode = 'r'

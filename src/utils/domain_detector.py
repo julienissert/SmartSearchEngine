@@ -26,8 +26,13 @@ def init_domain_references():
         vec_audit = np.mean(embeddings, axis=0)
         DOMAIN_VECTORS_AUDIT[domain] = vec_audit / np.linalg.norm(vec_audit)
 
-def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str = None, 
-                  content_dict: dict = None, precomputed_vector: np.ndarray = None):
+def detect_domain(
+    text: str | None = None, 
+    pil_image: Image.Image | None = None, 
+    filepath: str | None = None, 
+    content_dict: dict | None = None, 
+    precomputed_vector: np.ndarray | None = None
+):
     """
     Détecteur de domaine pro à 3 couches.
     Optimisé pour capturer le signal sémantique des datasets complexes.
@@ -74,8 +79,10 @@ def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str
     # --- ÉTAPE B : LOGIQUE DE DÉCISION HIÉRARCHIQUE ---
 
     # PRIORITÉ 1 : Si la structure (clés CSV/nom de fichier) est claire (> 0.50)
-    best_struct = max(struct_scores, key=struct_scores.get)
-    if struct_scores[best_struct] > 0.50:
+    best_struct = max(struct_scores, key=lambda k: struct_scores[k], default="unknown")
+    
+    # On vérifie si on a un domaine valide avant de tester le score
+    if best_struct != "unknown" and struct_scores[best_struct] > 0.50:
         return best_struct, struct_scores, "structural_context_forced"
 
     # PRIORITÉ 2 : Fusion sémantique (AI + Structure)
@@ -89,11 +96,10 @@ def detect_domain(text: str = None, pil_image: Image.Image = None, filepath: str
     exp_logits = np.exp(logits - np.max(logits))
     probs_values = exp_logits / np.sum(exp_logits)
     ai_probabilities = {k: float(p) for k, p in zip(final_probs.keys(), probs_values)}
-
-    best_final = max(final_probs, key=final_probs.get)
     
-    # SÉCURITÉ : Seuil de rejet
-    if final_probs[best_final] < 0.25:
+    best_final = max(final_probs, key=lambda k: final_probs[k], default="unknown")
+    
+    if best_final == "unknown" or final_probs[best_final] < 0.25:
         return "unknown", ai_probabilities, "low_confidence_rejection"
 
     return best_final, ai_probabilities, "semantic_fusion"

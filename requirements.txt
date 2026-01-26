@@ -13,11 +13,12 @@ Pillow==10.2.0
 # --- DATA & FORMATS ---
 pandas==2.2.0
 numpy==1.26.3
+pyarrow>=14.0.0
 h5py>=3.10.0
 pymupdf>=1.23.0
 
 # --- VECTOR SEARCH ---
-# Note : 'faiss-gpu' est préférable si vous utilisez la base NVIDIA du Dockerfile
+lancedb>=0.6.0       
 faiss-cpu==1.8.0
 
 # --- VISUALISATION & API ---
