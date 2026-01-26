@@ -149,5 +149,5 @@ def create_vector_index():
     # On crée l'index uniquement s'il y a assez de données (ex: > 1000 docs)
     if len(table) > 1000:
         logger.info("Construction de l'index vectoriel sur disque...")
-        table.create_index(metric="cosine", num_partitions=256, num_sub_vectors=96)
+        table.create_index(metric="cosine", num_partitions=256, num_sub_vectors=64)
         logger.info(" Index vectoriel optimisé.")
