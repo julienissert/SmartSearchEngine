@@ -8,8 +8,7 @@ Le système sépare strictement les données brutes, les artefacts calculés et 
 
 * **`raw-datasets/`** : Données sources (CSV, PDF, Images, TXT, H5).
 * **`computed-data/`** : Fichiers générés (Index FAISS et base JSON).
-    * **`indexes/`** : Contient les fichiers `.index` par domaine.
-    * **`metadata_db.json`** : Base de données textuelle complète synchronisée.
+    * **`lancedb_store/`** : Base de données vectorielle unifiée (Format .lance). Contient le catalogue et les contrats de dossiers.
 * **`src/`** : Dossier racine du code source.
 
 ## Installation des dépendances :
@@ -34,6 +33,10 @@ Le serveur sera disponible sur http://localhost:8000/docs.
 3. Lancement du serveur d'ingestion (Watchdog)
 ```bash
 python -m src.utils.watcher
-````
+```
 Celui sert à lancer l'ingestion automatiquement dès l'ajout de nouveaux datasets dans le répertoire dédié.
 
+4. Dashboard d'Exploration
+```bash
+streamlit run src/utils/dashboard.py
+```
