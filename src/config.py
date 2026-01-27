@@ -101,14 +101,14 @@ for path in [COMPUTED_DIR, LANCEDB_URI]:
 # --- CHARGEMENT DYNAMIQUE DES DOMAINES ---
 _env_domains = os.getenv("TARGET_DOMAINS")
 
-if not _env_domains:
-    raise ValueError(
-        "ERREUR CRITIQUE DE CONFIGURATION : La variable d'environnement 'TARGET_DOMAINS' est manquante ou vide. "
-        "Veuillez la définir dans le fichier docker-compose.yml sous la section environment. "
-        "Exemple : - TARGET_DOMAINS=food,medical,finance"
-    )
-
-TARGET_DOMAINS = [d.strip() for d in _env_domains.split(",") if d.strip()]
+if _env_domains:
+    # Cas 1 : Variable d'environnement présente (Docker ou Prod)
+    TARGET_DOMAINS = [d.strip() for d in _env_domains.split(",") if d.strip()]
+else:
+    # Cas 2 : Variable absente (Lancement local python src/main.py ...)
+    # On définit des valeurs par défaut et on prévient l'utilisateur
+    print("⚠️  Variable 'TARGET_DOMAINS' introuvable. Utilisation des domaines par défaut (Mode Local).")
+    TARGET_DOMAINS = ["food", "medical"]
 
 SEMANTIC_THRESHOLD = 0.65 
 LABEL_MIN_LENGTH = 3
