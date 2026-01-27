@@ -9,6 +9,7 @@ x-common-config: &common-config
     - PYTHONPATH=/app
     - METADATA_DB_PATH=/app/computed-data/metadata/metadata.db
     - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    - TARGET_DOMAINS=food,medical,cars
   volumes:
     - ./raw-datasets:/app/raw-datasets
     - ./computed-data:/app/computed-data

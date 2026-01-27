@@ -98,7 +98,18 @@ TABLE_NAME = "multimodal_catalog"
 for path in [COMPUTED_DIR, LANCEDB_URI]:
     path.mkdir(parents=True, exist_ok=True)
 
-TARGET_DOMAINS = ["food", "medical"]
+# --- CHARGEMENT DYNAMIQUE DES DOMAINES ---
+_env_domains = os.getenv("TARGET_DOMAINS")
+
+if not _env_domains:
+    raise ValueError(
+        "ERREUR CRITIQUE DE CONFIGURATION : La variable d'environnement 'TARGET_DOMAINS' est manquante ou vide. "
+        "Veuillez la définir dans le fichier docker-compose.yml sous la section environment. "
+        "Exemple : - TARGET_DOMAINS=food,medical,finance"
+    )
+
+TARGET_DOMAINS = [d.strip() for d in _env_domains.split(",") if d.strip()]
+
 SEMANTIC_THRESHOLD = 0.65 
 LABEL_MIN_LENGTH = 3
 LABEL_MAX_LENGTH = 50
