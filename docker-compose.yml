@@ -2,7 +2,7 @@ version: '3.8'
 
 # Configuration commune pour éviter les répétitions (DRY)
 x-common-config: &common-config
-  image: julienisrt/smartsearchengine:latest
+  image: julienisrt/smartsearchengine:v3.1.1
   # build: . # Décommentez pour builder localement si vous modifiez le code
   environment:
     - OCR_LANG=latin
