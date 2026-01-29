@@ -19,6 +19,14 @@ LOADER_MAPPING = {
     '.jpg': ImageLoader, '.jpeg': ImageLoader, '.png': ImageLoader, '.webp': ImageLoader
 }
 
+VISUAL_EXTENSIONS = {ext for ext, cls in LOADER_MAPPING.items() if cls == ImageLoader}
+
+def is_visual_type(path: str) -> bool:
+    """Vérifie si le fichier est de type image selon le mapping officiel."""
+    ext = os.path.splitext(path)[1].lower()
+    return ext in VISUAL_EXTENSIONS
+
+
 # 2. Cache d'instances 
 LOADER_CACHE = {}
 

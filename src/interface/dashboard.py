@@ -29,7 +29,7 @@ with st.sidebar:
     table = db.open_table(config.TABLE_NAME)
     has_contracts = "folder_contracts" in db.table_names()
     
-    st.metric("Total Documents", f"{len(table):,}")
+    st.metric("Total Vectors", f"{len(table):,}")
     if has_contracts:
         contract_table = db.open_table("folder_contracts")
         st.metric("Contrats Dossiers", f"{len(contract_table)}")
@@ -42,7 +42,7 @@ with st.sidebar:
         placeholder="ex: domain = 'food' AND domain_score > 0.8"
     )
     
-    limit = st.number_input("Nombre de lignes à afficher", value=100, step=50)
+    limit = st.number_input("Nombre de lignes à afficher", value=1000, step=50)
     
     st.divider()
     st.caption(f"Base : {config.LANCEDB_URI}")
@@ -67,7 +67,7 @@ with tab1:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "domain_score": st.column_config.NumberColumn("Score Confiance", format="%.4f"),
+                "domain_score": st.column_config.NumberColumn("Score Confiance", format="%.2f"),
                 "extra": st.column_config.JsonColumn("Détails IA (JSON)"),
                 "source": st.column_config.TextColumn("Chemin du fichier")
             }

@@ -2,6 +2,7 @@
 import importlib
 from src import config  
 from src.utils.logger import setup_logger 
+from src.intelligence.llm_manager import llm
 
 logger = setup_logger("EnvChecker")
 
@@ -32,7 +33,12 @@ def check_environment():
             else:
                 logger.warning(f" {description} ({module}) n'est pas installé.")
 
-
+    # --- AJOUT ÉLITE : VÉRIFICATION OLLAMA ---
+    if not llm.is_healthy():
+        logger.warning("Ollama n'est pas détecté. L'arbitrage IA et l'enrichissement seront désactivés.")
+    else:
+        logger.info(f"Ollama est opérationnel (Modèle: {config.LLM_MODEL})")
+        
     config.COMPUTED_DIR.mkdir(parents=True, exist_ok=True)
     config.LANCEDB_URI.mkdir(parents=True, exist_ok=True)
     

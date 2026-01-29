@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from search.routes import router
+from src.search.routes import router
 from src.utils.logger import setup_logger
 
 logger = setup_logger("SearchAPI")

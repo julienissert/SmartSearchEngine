@@ -41,6 +41,7 @@ def init_tables():
     # 2. Schéma des Contrats de dossier (Sans vecteur, pour la rapidité)
     contract_schema = pa.schema([
         pa.field("folder_path", pa.string()),
+        pa.field("signature", pa.string()),
         pa.field("assigned_domain", pa.string()),
         pa.field("confidence", pa.float32()),
         pa.field("is_verified", pa.int32())
@@ -106,14 +107,14 @@ def update_file_source(file_hash, new_source):
     table.update(where=f"file_hash = '{file_hash}'", values={"source": str(new_source)})
 
 def get_folder_contract(folder_path):
-    """Récupère le contrat de domaine d'un dossier."""
+    """Récupère le contrat complet d'un dossier."""
     db = get_db()
-    if "folder_contracts" not in db.table_names(): return None
+    if "folder_contracts" not in list(db.table_names()): return None
     table = db.open_table("folder_contracts")
-    res = table.search().where(f"folder_path = '{str(folder_path)}'").to_pandas()
-    return res.iloc[0]['assigned_domain'] if not res.empty else None
+    res = table.search().where(f"folder_path = '{str(folder_path)}'", prefilter=True).to_pandas()
+    return res.iloc[0].to_dict() if not res.empty else None
 
-def save_folder_contract(folder_path, domain, confidence=1.0, verified=0):
+def save_folder_contract(folder_path, domain, signature,confidence=1.0, verified=0):
     """Enregistre ou met à jour un contrat de dossier (Logique Upsert)."""
     db = get_db()
     table = db.open_table("folder_contracts")
@@ -121,27 +122,51 @@ def save_folder_contract(folder_path, domain, confidence=1.0, verified=0):
     
     table.add([{
         "folder_path": str(folder_path),
+        "signature": str(signature),
         "assigned_domain": domain,
         "confidence": float(confidence),
         "is_verified": int(verified)
     }])
 
 def reset_store():
-    """Réinitialisation totale (Nettoyage physique du disque)."""
+    """Réinitialisation totale (Base de données + Cache schémas)."""
     db = get_db()
     for t in db.table_names():
         db.drop_table(t)
+    
+    if config.SCHEMA_CACHE_PATH.exists():
+        config.SCHEMA_CACHE_PATH.unlink()
+        logger.info(f"Mémoire sémantique effacée : {config.SCHEMA_CACHE_PATH.name}")
+    
     init_tables()
-    logger.info("Store LanceDB totalement réinitialisé.")
+    logger.info("Store LanceDB totalement réinitialisé (Page blanche).")
     
 def get_all_indexed_hashes():
-    """Récupère tous les hashs pour le Fast-Check incremental."""
-    db = get_db()
-    if config.TABLE_NAME not in db.table_names(): return set()
-    
-    table = db.open_table(config.TABLE_NAME)
-    df = table.search().select(["file_hash"]).to_pandas()
-    return set(df["file_hash"].tolist())
+    """Récupère TOUTES les signatures (hashes) pour éviter de ré-ingérer l'existant."""
+    try:
+        db = get_db()
+        all_tables = list(db.table_names())
+        if config.TABLE_NAME not in all_tables: 
+            return set()
+        
+        table = db.open_table(config.TABLE_NAME)
+        
+        if table.count_rows() == 0:
+            return set()
+        query_builder = table.search() 
+        df = query_builder.select(["file_hash"]).to_pandas()
+        
+        if "file_hash" in df.columns:
+            hashes = df["file_hash"].dropna().unique().astype(str).tolist()
+            indexed_set = set(hashes)
+            logger.info(f"Fast-Check : {len(indexed_set)} signatures uniques trouvées en base.")
+            return indexed_set
+        
+        return set()
+
+    except Exception as e:
+        logger.error(f"Erreur Fast-Check (récupération hashes) : {e}")
+        return set()
 
 def create_vector_index():
     """Crée un index IVF-PQ pour garantir des recherches sub-secondes sur disque."""

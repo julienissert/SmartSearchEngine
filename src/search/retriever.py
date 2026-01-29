@@ -1,118 +1,77 @@
 # src/search/retriever.py
-import numpy as np
 import pandas as pd
-from src import config
-from collections import Counter
-from src.embeddings.text_embeddings import embed_text
 from src.indexing.vector_store import init_tables 
+from src.search.scorer import TrustScorer
 from src.utils.logger import setup_logger
 
-logger = setup_logger("SearchEngine", log_file="search.log")
+logger = setup_logger("SearchEngine")
 
 class MultiDomainRetriever:
     def __init__(self):
-        # init_tables() assure que la DB est connectée ET que la table est là
+        # Initialisation unique de la table LanceDB
         self.table = init_tables()
         logger.info("Moteur de recherche hybride LanceDB prêt.")
 
-    def search(self, image_vector, query_ocr="", k=5):
-        logger.info(f"--- Requête Hybride (OCR: '{query_ocr.strip()}') ---")
-        
-        # 1. On récupère les candidats (Fusion Visuel + Textuel)
-        all_candidates = self._get_hybrid_candidates(image_vector, query_ocr)
-        
-        if not all_candidates:
-            return []
+    def search(self, processed_query: dict, k: int = 5):
+        """
+        Recherche chirurgicale : Utilise le vecteur CLIP + les filtres SQL du LLM.
+        """
+        vector = processed_query["vector"]
+        filters = processed_query["filters"]
+        ocr_text = processed_query["ocr_text"]
 
-        # 2. On valide le label (Consensus entre les meilleurs résultats)
-        verified_label = self._determine_verified_label(all_candidates, query_ocr)
+        # 1. CONSTRUCTION DU FILTRE SQL (Metadata Filtering)
+        sql_filter = self._build_sql_filter(filters)
 
-        # 3. On construit la réponse finale (Agrégation par label ou Top K)
-        results = self._build_final_response(all_candidates, verified_label, k)
-        
-        return results
-
-    def _get_hybrid_candidates(self, image_vector, query_ocr):
-        """Fusionne les résultats de recherche Image et Texte."""
-        results_list = []
-
-        # -- BRANCHE 1 : Recherche Visuelle (Image) --
-        if image_vector is not None:
-            v_img = np.array(image_vector).astype('float32')
-            norm = np.linalg.norm(v_img)
-            search_vec = (v_img / norm if norm > 0 else v_img).tolist()
+        try:
+            # 2. EXÉCUTION DE LA RECHERCHE VECTORIELLE FILTRÉE
+            query = self.table.search(vector)
             
-            # Recherche Top 50 par similarité cosinus
-            res_vis = self.table.search(search_vec).limit(50).to_pandas()
-            if not res_vis.empty:
-                res_vis['origin'] = 'visual'
-                results_list.append(res_vis)
+            if sql_filter:
+                logger.info(f"Application des filtres SQL : {sql_filter}")
+                query = query.where(sql_filter)
+            
+            results_df = query.limit(k).to_pandas()
 
-        # -- BRANCHE 2 : Recherche Textuelle (OCR / Query) --
-        if query_ocr.strip():
-            text_vec = embed_text(query_ocr)
-            v_txt = np.array(text_vec).astype('float32')
-            norm_t = np.linalg.norm(v_txt)
-            search_vec_t = (v_txt / norm_t if norm_t > 0 else v_txt).tolist()
+            # 3. FALLBACK (Sécurité)
+            if results_df.empty and sql_filter:
+                logger.warning("Filtres trop stricts, fallback sur recherche vectorielle pure.")
+                results_df = self.table.search(vector).limit(k).to_pandas()
 
-            res_txt = self.table.search(search_vec_t).limit(50).to_pandas()
-            if not res_txt.empty:
-                res_txt['origin'] = 'textual'
-                res_txt['_distance'] = res_txt['_distance'] * 0.9 
-                results_list.append(res_txt)
+            # 4. SCORING ET FORMATAGE
+            final_results = []
+            for _, row in results_df.iterrows():
+                res_dict = row.to_dict()
+                
+                scoring = TrustScorer.calculate_score(res_dict, ocr_text, filters)
+                
+                # On enrichit le dictionnaire avec les scores
+                res_dict["confidence_score"] = scoring["confidence"]
+                res_dict["confidence_details"] = scoring["details"]
+                final_results.append(res_dict)
 
-        if not results_list:
+            # Tri par score de confiance décroissant
+            return sorted(final_results, key=lambda x: x["confidence_score"], reverse=True)
+
+        except Exception as e:
+            logger.error(f"Erreur lors de la recherche : {e}")
             return []
 
-        combined = pd.concat(results_list).sort_values('_distance')
-        combined = combined.drop_duplicates(subset=['source'])
-
-        candidates = []
-        for _, row in combined.iterrows():
-            candidates.append({
-                "score": row.get("_distance", 1.0),
-                "domain": row["domain"],
-                "label": row["label"].lower(),
-                "type": row["type"],
-                "source": row["source"],
-                "content": row["content"],
-                "snippet": row["snippet"]
-            })
-        return candidates
-
-    def _determine_verified_label(self, candidates, query_ocr):
-        """Garde ta logique de consensus Élite."""
-        if query_ocr.strip():
-            ocr_text = query_ocr.lower()
-            potential_labels = {c["label"] for c in candidates[:15] if c["label"] != "unknown"}
-            for lbl in potential_labels:
-                if lbl in ocr_text: return lbl
-
-        # Validation par vote majoritaire (Consensus)
-        top_voters = [c["label"] for c in candidates[:15] if c["label"] != "unknown"]
-        if top_voters:
-            main_label, count = Counter(top_voters).most_common(1)[0]
-            if count >= 3: return main_label
-        return None
-
-    def _build_final_response(self, candidates, target_label, k):
-        """Finalise le pack de résultats."""
-        if target_label:
-            res_df = self.table.search().where(f"label = '{target_label}'").limit(k).to_pandas()
-            source_items = res_df.to_dict('records')
-        else:
-            source_items = candidates[:k]
-
-        final_results = []
-        for item in source_items:
-            final_results.append({
-                "domain": item["domain"],
-                "label": item["label"],
-                "source": item["source"],
-                "type": item["type"],
-                "snippet": item.get("snippet", ""),
-                "score": item.get("_distance", 0.0)
-            })
-        return final_results
+    def _build_sql_filter(self, filters: dict) -> str:
+        """Transforme l'intention du LLM en clause SQL."""
+        clauses = []
+        
+        # Filtrage par domaine
+        domain = filters.get("domain")
+        if domain and domain != "unknown":
+            clauses.append(f"domain = '{domain}'")
+        
+        # Filtrage par label 
+        label = filters.get("label")
+        if label and label != "unknown":
+            label_esc = str(label).replace("'", "''")
+            clauses.append(f"label LIKE '%{label_esc}%'")
+            
+        return " AND ".join(clauses)
 
 retriever = MultiDomainRetriever()

@@ -32,11 +32,11 @@ Le serveur sera disponible sur http://localhost:8000/docs.
 
 3. Lancement du serveur d'ingestion (Watchdog)
 ```bash
-python -m src.utils.watcher
+python -m src.services.watcher
 ```
 Celui sert à lancer l'ingestion automatiquement dès l'ajout de nouveaux datasets dans le répertoire dédié.
 
 4. Dashboard d'Exploration
 ```bash
-streamlit run src/utils/dashboard.py
+streamlit run src/interface/dashboard.py
 ```

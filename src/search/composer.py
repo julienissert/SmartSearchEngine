@@ -1,43 +1,41 @@
 # src/search/composer.py
 import json
+from src.utils.logger import setup_logger
+
+logger = setup_logger("Composer")
 
 class ResultComposer:
     def build_response(self, matches, ocr_text):
         """
-        Prend les résultats bruts de LanceDB et les formate proprement.
-        Plus besoin de requêtes SQLite, tout est déjà dans 'matches'.
+        Prend les résultats du Retriever et les formate en faits bruts.
+        Format : Domaine, Label, Informations Enrichies, Score.
         """
         final_results = []
         
         for m in matches:
-            res = {
-                "domain": m["domain"],
-                "label": m["label"],
-                "source": m["source"],
-                "type": m.get("type", "unknown"),
-                "match_score": round(m["score"], 4),
-                "origin": m.get("origin", "hybrid_search")
-            }
-
-            # LOGIQUE D'ENRICHISSEMENT (Snippet ou extra)
-            if m.get("snippet"):
-                res["details"] = m["snippet"]
-            
+            enriched_info = {}
             if m.get("extra"):
                 try:
-                    if isinstance(m["extra"], str):
-                        res["metadata_extended"] = json.loads(m["extra"])
-                    else:
-                        res["metadata_extended"] = m["extra"]
-                except:
-                    pass
+                    enriched_info = json.loads(m["extra"]) if isinstance(m["extra"], str) else m["extra"]
+                except Exception:
+                    enriched_info = {}
+
+            res = {
+                "domain": m.get("domain", "unknown"),
+                "label": m.get("label", "unknown"),
+                "confidence_score": m.get("confidence_score", 0.0),
+                "metadata_enriched": enriched_info,
+                "source_file": m.get("source", "unknown"),
+                "match_details": m.get("confidence_details", {})
+            }
             
             final_results.append(res)
         
         return {
+            "status": "success" if final_results else "no_results",
             "query_ocr": ocr_text,
-            "total_count": len(final_results),
-            "top_results": final_results
+            "count": len(final_results),
+            "results": final_results
         }
 
 composer = ResultComposer()

@@ -12,9 +12,9 @@ if __name__ == "__main__":
         pass
 
 # --- IMPORTS ÉLITE (Tous préfixés par src.) ---
-from src.utils.environment import check_environment
 from src.utils.logger import setup_logger
-from src.utils.watcher import start_watching
+from src.services.watcher import start_watching
+from src.services.environment import check_environment
 
 logger = setup_logger("Main")
 
