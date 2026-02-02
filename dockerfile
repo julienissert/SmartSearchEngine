@@ -18,14 +18,30 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     sqlite3 \
     libsqlite3-dev \
+    procps \ 
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 3. Installation des dépendances Python
+# 3. Installation Stratégique des dépendances (Split)
+
+# A. Mise à jour de pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# B. Installation des "Lourds" (Torch & Nvidia) en premier
+# On force l'installation ici pour gérer l'espace disque étape par étape.
+# Note : On utilise l'index CUDA 12.1 pour être sûr d'avoir la version GPU compatible
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# C. Installation de Paddle (OCR) séparément
+RUN pip install --no-cache-dir paddlepaddle-gpu==2.6.0 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html || \
+    pip install --no-cache-dir paddlepaddle==2.6.0
+
+# D. Installation du reste des requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    export CFLAGS="-Wno-error=incompatible-pointer-types" && \
+# On ignore les erreurs de dépendances pointer-types et on demande à pip d'ignorer
+# torch/paddle s'ils sont déjà installés (grâce aux étapes précédentes)
+RUN export CFLAGS="-Wno-error=incompatible-pointer-types" && \
     pip install --no-cache-dir -r requirements.txt
 
 # --- AJOUT SÉCURITÉ THREADS ---
@@ -37,12 +53,15 @@ ENV OPENBLAS_NUM_THREADS=1
 COPY src/ ./src/
 COPY .env .
 
-# 5. Création des dossiers nécessaires [cite: 1, 18, 19]
-RUN mkdir -p raw-datasets computed-data/indexes computed-data/metadata logs
+# 5. Création explicite de l'arborescence
+RUN mkdir -p \
+    raw-datasets \
+    computed-data/indexes \
+    computed-data/metadata \
+    logs \
+    /root/.cache/huggingface \
+    /root/.paddleocr
 
-# Configuration du PYTHONPATH [cite: 27]
 ENV PYTHONPATH=/app
 
-# Désactivation du pre-download pendant le build pour éviter le Segfault sur Mac
-# Les modèles seront téléchargés au premier RUN du conteneur
 ENTRYPOINT ["python", "src/main.py"]

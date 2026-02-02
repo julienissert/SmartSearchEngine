@@ -57,27 +57,6 @@ MAX_CLIP_CANDIDATES = 500
 ENABLE_STATISTICAL_FALLBACK = True
 FILE_READ_BUFFER_SIZE = 65536
 
-# --- CONFIGURATION OLLAMA ---
-OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
-
-def get_llm_resources():
-    settings = {"model": "phi3:latest", "num_ctx": 2048, "timeout": 120}
-    if DEVICE == "cuda":
-        try:
-            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            if vram_gb >= 10:
-                settings.update({"model": "llama3:8b", "num_ctx": 8192, "timeout": 45})
-            elif vram_gb >= 6:
-                settings.update({"model": "llama3:latest", "num_ctx": 4096, "timeout": 60})
-        except: pass 
-    return settings
-
-_res_llm = get_llm_resources()
-LLM_CONFIG = {
-    "model": _res_llm["model"],
-    "temperature": 0.1,     
-    "num_ctx": _res_llm["num_ctx"],
-    "timeout": _res_llm["timeout"]
-}
-LLM_MODEL = LLM_CONFIG["model"]
+# --- SUPPRESSION DU BLOC OLLAMA QUI ÉTAIT ICI ---
+# La configuration LLM est désormais gérée exclusivement par src/config.py
+# pour éviter les conflits d'URL (localhost vs ollama service)

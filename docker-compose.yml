@@ -3,19 +3,37 @@ version: '3.8'
 # Configuration commune pour éviter les répétitions (DRY)
 x-common-config: &common-config
   image: julienisrt/smartsearchengine:v3.1.1
-  # build: . # Décommentez pour builder localement si vous modifiez le code
+  build: # Décommentez pour builder localement si vous modifiez le code
+    context: .
+    dockerfile: Dockerfile
   environment:
+    - TRANSFORMERS_CACHE=/root/.cache/huggingface
     - OCR_LANG=latin
     - PYTHONPATH=/app
     - METADATA_DB_PATH=/app/computed-data/metadata/metadata.db
     - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     - TARGET_DOMAINS=food,medical,cars
+    # CONFIGURATION LLM
+    - OLLAMA_HOST=ollama
+    - LLM_MODEL_NAME=mistral
+    # Active la visibilité GPU pour PyTorch/Ollama
+    - NVIDIA_VISIBLE_DEVICES=all
   volumes:
     - ./raw-datasets:/app/raw-datasets
     - ./computed-data:/app/computed-data
     - ./logs:/app/logs
     - ./model_cache:/root/.cache/huggingface
     - ./paddle_cache:/root/.paddleocr
+  depends_on:
+    - ollama
+  # Activation du GPU pour CLIP / OCR / Ingestion
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
 
 services:
   # SERVICE 1 : Ingestion Manuelle
@@ -25,14 +43,6 @@ services:
     container_name: engine_ingest
     stdin_open: true
     tty: true
-    # On n'active pas le GPU par défaut pour l'ingestion manuelle sauf besoin
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
 
   # SERVICE 2 : Surveillance (Watchdog)
   watcher:
@@ -40,13 +50,6 @@ services:
     container_name: engine_watcher
     restart: unless-stopped
     command: ["watch"]
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
 
   # SERVICE 3 : API de Recherche
   search:
@@ -56,11 +59,21 @@ services:
       - "8000:8000"
     restart: unless-stopped
     command: ["serve"]
-    # Optionnel : Activer le GPU si vos embeddings/recherche sont lourds
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+
+  # SERVICE 4 : OLLAMA (Cerveau LLM)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: smartsearch_ollama
+    volumes:
+      # PERSISTANCE : Stocke les modèles (Mistral, etc.) sur le disque hôte
+      # pour ne pas les retélécharger à chaque redémarrage.
+      - ./ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
