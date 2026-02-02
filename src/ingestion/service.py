@@ -179,12 +179,14 @@ class IngestionService:
                     final_domain = detected_domain
                     if final_domain == "unknown" and isinstance(valid_labels, dict):
                         final_domain = valid_labels.get('domain', 'unknown')
-
+                        
+                    is_verified = 1 if detected_score >= 0.90 else 0
                     save_folder_contract(
                         folder_path=archive_path, 
                         domain=str(final_domain), 
                         signature=folder_sig, # Empreinte du dossier (Niveau 1)
-                        confidence=float(detected_score) if detected_score > 0 else 1.0
+                        confidence=float(detected_score) if detected_score > 0 else 1.0,
+                        verified=is_verified
                     )
                     logger.info(f" Contrat scellé : {final_domain} ({detected_score:.2f})")
 
