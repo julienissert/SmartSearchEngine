@@ -7,8 +7,13 @@ import json
 import os
 from src import config
 from src.utils.logger import setup_logger
+import time 
+import random
 
 logger = setup_logger("VectorStore")
+
+MAX_RETRIES = 5
+BASE_DELAY = 0.2  
 
 _db_connection = None
 
@@ -56,37 +61,60 @@ def init_tables():
     return db.open_table(config.TABLE_NAME)
 
 def add_documents(metadata_list, vector_list):
-    """Insertion atomique avec normalisation L2 (Héritage FAISS Elite)."""
+    """Insertion atomique avec normalisation L2 et Retry Sécurité (Windows/Rust)."""
     if not metadata_list or not vector_list:
         return 0
+    
+    # Configuration du Retry
+    MAX_RETRIES = 5
+    BASE_DELAY = 0.2 
     
     table = init_tables()
     rows = []
 
+    # --- ÉTAPE 1 : PRÉPARATION ET NORMALISATION ---
     for meta, vec in zip(metadata_list, vector_list):
-        # --- ROBUSTESSE : Normalisation L2 impérative (Standard CLIP) ---
+        # Normalisation L2 (Essentiel pour la précision CLIP)
         v = np.array(vec).astype('float32')
         norm = np.linalg.norm(v)
         v = v / norm if norm > 0 else v
         
-        # --- PRÉPARATION : Mapping des colonnes ---
-        content_str = meta.get('content', '')
+        content_str = str(meta.get('content', ''))
+        
         rows.append({
             "vector": v.tolist(),
-            "source": str(meta.get('source')),
-            "file_hash": meta.get('file_hash'),
-            "type": meta.get('type', 'unknown'),
-            "domain": meta.get('domain', 'unknown'),
-            "label": meta.get('label', 'unknown'),
+            "source": str(meta.get('source', '')),
+            "file_hash": str(meta.get('file_hash', '')),
+            "type": str(meta.get('type', 'unknown')),
+            "domain": str(meta.get('domain', 'unknown')),
+            "label": str(meta.get('label', 'unknown')),
             "domain_score": float(meta.get('domain_score', 0.0)),
             "content": content_str[:20000], 
-            "snippet": meta.get('snippet') or content_str[:500],
+            "snippet": str(meta.get('snippet') or content_str[:500]),
             "extra": json.dumps(meta.get('extra', {}), ensure_ascii=False)
         })
 
-    # LanceDB gère l'atomicité de l'écriture
-    table.add(rows)
-    return len(rows)
+    # --- ÉTAPE 2 : INSERTION AVEC RETRY (BOUCLE ANTI-COLLISION RUST) ---
+    for attempt in range(MAX_RETRIES):
+        try:
+            table.add(rows)
+            return len(rows) # Succès !
+            
+        except Exception as e:
+            # On détecte si c'est une erreur de verrouillage fichier (propre à Windows)
+            error_msg = str(e).lower()
+            is_lock_error = any(x in error_msg for x in ["access denied", "locked", "being used", "permission denied"])
+            
+            if is_lock_error and attempt < MAX_RETRIES - 1:
+                wait_time = BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.1)
+                logger.warning(f"⚠️ Collision Windows détectée (Attempt {attempt+1}/{MAX_RETRIES}). Retry dans {wait_time:.2f}s...")
+                time.sleep(wait_time)
+                table = init_tables()
+            else:
+                logger.error(f"Échec critique insertion LanceDB : {e}")
+                return 0
+    
+    return 0
 
 # --- LOGIQUE DE MAINTENANCE (Portage SQLite) ---
 
