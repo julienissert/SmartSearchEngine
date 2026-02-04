@@ -9,7 +9,7 @@ from src.intelligence.handlers.raw_handler import resolve_raw_label
 from src.intelligence.handlers.structured_handler import resolve_structured_label
 from src.intelligence.llm_manager import llm
 from src.utils.logger import setup_logger
-
+import pandas as pd
 logger = setup_logger("LabelDetector")
 
 # Cache pour les correspondances explicites (filename -> label) [Niveau 0]
@@ -22,11 +22,19 @@ def clear_memory():
     gc.collect()
     logger.info("RAM nettoyée : Prêt pour le prochain lot de données.")
 
-def is_label_noisy(label: str) -> bool:
-    """Détecte si un label est un identifiant technique ou du bruit (Niveau 3)."""
-    if not label or len(label) < 2: return True
-    if label.isdigit() or str(label).startswith("auto_"): return True 
-    if label.lower() in ["image", "img", "photo", "doc", "unknown", "document", "file"]: return True
+def is_label_noisy(label) -> bool:
+    """
+    Détecte si un label est un identifiant technique ou du bruit (Niveau 3).
+    Gère les types numpy.int64 envoyés par pandas.
+    """
+    val = str(label).strip()
+    
+    if not val or len(val) < 2: return True
+    
+    if val.isdigit(): return True 
+
+    if val.lower() in ["image", "img", "photo", "doc", "unknown", "document", "file"]: 
+        return True       
     return False
 
 def analyze_dataset_structure(dataset_path):
@@ -38,6 +46,7 @@ def analyze_dataset_structure(dataset_path):
     global _FILE_MAPPING_CACHE
     valid_labels = set()
     leaf_folders = []
+    file_plans = {}
     
     logger.info(f"Analyse sémantique du dataset : {dataset_path}...")
 
@@ -45,10 +54,15 @@ def analyze_dataset_structure(dataset_path):
     for root, _, files in os.walk(dataset_path):
         if files: 
             leaf_folders.append(os.path.basename(root))
+            
         for f in files:
-            if f.endswith((".txt", ".csv")) and any(x in f.lower() for x in ["label", "mapping", "meta"]):
+            path = os.path.join(root, f)
+            ext = f.lower()
+            
+            # --- 1. CAS A : FICHIERS DE MAPPING TECHNIQUE (img=label) ---
+            if any(ext.endswith(x) for x in [".txt", ".csv", ".tsv"]) and any(x in f.lower() for x in ["label", "mapping", "meta"]):
                 try:
-                    with open(os.path.join(root, f), "r", encoding="utf-8") as file:
+                    with open(path, "r", encoding="utf-8", errors="ignore") as file:
                         for line in file:
                             if "=" in line or ":" in line:
                                 parts = re.split(r'[=:]', line, maxsplit=1)
@@ -57,13 +71,53 @@ def analyze_dataset_structure(dataset_path):
                                     label_val = parts[1].strip().lower()
                                     _FILE_MAPPING_CACHE[img_file] = label_val
                                     valid_labels.add(label_val)
-                            # Fallback : une liste de labels par ligne
                             elif len(line.strip()) >= config.LABEL_MIN_LENGTH:
                                 valid_labels.add(line.strip().lower())
                 except Exception as e:
                     logger.warning(f"Erreur lecture mapping {f}: {e}")
+                continue 
 
-    # 2. Filtrage intelligent des dossiers (Niveau 1)
+            # --- 2. CAS B : DISCOVERY POUR DONNÉES STRUCTURÉES ---
+            if any(ext.endswith(x) for x in [".txt", ".csv", ".tsv"]):
+                abs_key = os.path.abspath(path).lower()
+                plan = None
+
+                try:
+                    # Étape 1 : Heuristique rapide (CSV/TSV uniquement)
+                    if ".txt" not in ext:
+                        sep = '\t' if ext.endswith('.tsv') else (',' if ext.endswith('.csv') else None)
+                        
+                        df_sample = pd.read_csv(path, nrows=5, sep=sep, engine='python')
+                        
+                        magic_words = ["name", "label", "category", "titre", "product", "nom", "item"]
+                        for col in df_sample.columns:
+                            if any(word in str(col).lower() for word in magic_words):
+                                test_val = df_sample[col].iloc[0] if not df_sample[col].empty else ""
+                                
+                                if not is_label_noisy(test_val):
+                                    plan = {"type": "column", "key": col}
+                                    logger.info(f" Heuristique validée : Colonne '{col}' pour {f}")
+                                    break
+                                else:
+                                    logger.warning(f" Heuristique rejetée : '{col}' contient du bruit ('{test_val}')")
+                    
+                    # Étape 2 : LLM Discovery (Fallback si heuristique rejetée ou si c'est un TXT)
+                    if not plan and llm.is_healthy():
+                        with open(path, 'r', encoding='utf-8', errors='ignore') as tmp:
+                            sample = "".join([tmp.readline() for _ in range(10)])
+                        
+                        logger.info(f" Discovery LLM (Solo Test) requis pour : {f}")
+                        ext_name = ".txt" if ext.endswith(".txt") else (".csv" if ext.endswith(".csv") else ".tsv")
+                        plan = llm.identify_mapping_plan(sample, ext_name)
+
+                    if plan:
+                        file_plans[abs_key] = plan
+                        logger.info(f" Plan LLM validé pour {f} -> Colonne fixée : '{plan.get('key')}'")
+                except Exception as e:
+                    logger.error(f"Erreur durant la Discovery de {f}: {e}")
+                    continue
+
+    # 3. Filtrage intelligent des dossiers (Niveau 1)
     if leaf_folders:
         counts = Counter(leaf_folders)
         total = len(leaf_folders)
@@ -72,13 +126,18 @@ def analyze_dataset_structure(dataset_path):
             if name_low not in config.TECHNICAL_FOLDERS and (count/total < 0.15) and not is_label_noisy(name_low):
                 valid_labels.add(name_low)
 
-    # 3. Génération des vecteurs de référence
+    # 4. Génération des vecteurs et renvoi du pack complet
     labels_list = [lbl for lbl in valid_labels if lbl]
-    if not labels_list: return {}
+    vectors_dict = {}
+    if labels_list:
+        logger.info(f"Génération des vecteurs pour {len(labels_list)} labels de référence...")
+        vectors = embed_text_batch(labels_list)
+        vectors_dict = dict(zip(labels_list, vectors))
 
-    logger.info(f"Génération des vecteurs pour {len(labels_list)} labels de référence...")
-    vectors = embed_text_batch(labels_list)
-    return dict(zip(labels_list, vectors))
+    return {
+        "vectors": vectors_dict,
+        "file_plans": file_plans
+    }
 
 def detect_label(filepath, content, image=None, image_vector=None, label_mapping=None, suggested_label=None, type=None):
     """
@@ -90,6 +149,7 @@ def detect_label(filepath, content, image=None, image_vector=None, label_mapping
     if fname in _FILE_MAPPING_CACHE:
         return _FILE_MAPPING_CACHE[fname]
 
+    vectors_only = label_mapping.get('vectors', {}) if isinstance(label_mapping, dict) and 'vectors' in label_mapping else label_mapping
     # --- NIVEAU 1 & 2 : Handlers (Structure & IA Rapide) ---
     if isinstance(content, dict):
         label = resolve_structured_label(content, filepath, label_mapping, suggested_label)
@@ -99,7 +159,7 @@ def detect_label(filepath, content, image=None, image_vector=None, label_mapping
             text=content, 
             image=image, 
             image_vector=image_vector, 
-            label_mapping=label_mapping, 
+            label_mapping=vectors_only, 
             suggested_label=suggested_label
     )
 

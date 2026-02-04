@@ -33,10 +33,10 @@ def _init_ocr_worker():
 
 def _worker_load_file(args):
     """Worker ultra-léger : OCR CPU uniquement, pas de transfert d'image."""
-    file_path, file_hash = args
+    file_path, file_hash, context = args
     try:
         # dispatch_loader extrait le texte (OCR)
-        docs = dispatch_loader(file_path, valid_labels=None)
+        docs = dispatch_loader(file_path, valid_labels=context)
         if not docs: return []
         
         for i, doc in enumerate(docs):
@@ -141,7 +141,7 @@ class IngestionService:
                 valid_labels = analyze_dataset_structure(archive_path)
                 stream_buffer = []
 
-                worker_tasks = [(f, h) for f, h, s in files_info]
+                worker_tasks = [(f, h, valid_labels) for f, h, s in files_info]
                 results_gen = executor.map(_worker_load_file, worker_tasks, chunksize=config.INGESTION_CHUNKSIZE)
 
                 pbar = tqdm(total=len(files_info), desc=f" {archive_name[:15]}")

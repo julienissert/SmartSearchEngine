@@ -64,8 +64,17 @@ def resolve_structured_label(data_dict, source_path, label_mapping=None, suggest
     # --- COUCHE 0 : Validation Immédiate ---
     if suggested_label:
         return str(suggested_label).lower().strip()
-
-    # Identifiant unique du dataset (Dossier parent + Nom interne pour H5)
+    
+    if isinstance(label_mapping, dict) and 'file_plans' in label_mapping:
+        abs_path = os.path.abspath(source_path).lower()
+        plan = label_mapping['file_plans'].get(abs_path)
+        
+        if plan and plan.get('type') == 'column':
+            target_col = plan.get('key')
+            if data_dict and target_col in data_dict:
+                return str(data_dict[target_col]).lower().strip()
+    
+    vectors = label_mapping.get('vectors', {}) if isinstance(label_mapping, dict) and 'vectors' in label_mapping else (label_mapping or {})   
     dataset_id = os.path.dirname(source_path)
     cache_key = f"{dataset_id}::{dataset_name}" if dataset_name else dataset_id
     
@@ -83,12 +92,11 @@ def resolve_structured_label(data_dict, source_path, label_mapping=None, suggest
     keys = list(data_dict.keys())
     
     # Test 1 : Correspondance exacte avec ton dictionnaire de vérité
-    if label_mapping is not None: 
-        for key, value in data_dict.items():
-            val_clean = str(value).lower().strip()
-            if val_clean in label_mapping: 
-                _SCHEMA_CACHE[cache_key] = key
-                return val_clean
+    for key, value in data_dict.items():
+        val_clean = str(value).lower().strip()
+        if val_clean in vectors: 
+            _SCHEMA_CACHE[cache_key] = key
+            return val_clean
 
     # Test 2 : Mots-clés "Magiques" dans les en-têtes
     magic_words = ["name", "label", "category", "titre", "product", "nom", "item"]

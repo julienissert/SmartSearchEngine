@@ -195,6 +195,29 @@ class LLMManager:
             "Format: {\"domain\": \"string\", \"label\": \"string\", \"type\": \"string\"}"
         )
         return self._generate(prompt, system)
+    
+    def identify_mapping_plan(self, sample_text: str, extension: str):
+        """
+        Phase de 'Solo Test' : Analyse un échantillon pour fixer la règle d'extraction
+        """
+        system = "Tu es un expert en analyse de structure de données. Réponds uniquement en JSON."
+        
+        # Le prompt s'adapte selon l'extension pour être plus précis
+        if extension in ['.csv', '.tsv']:
+            prompt = (
+                f"Voici un échantillon d'un fichier {extension} :\n'{sample_text}'\n"
+                "Identifie la colonne qui contient le label (le nom, le titre ou l'entité principale).\n"
+                "Format de réponse : {\"type\": \"column\", \"key\": \"nom_de_la_colonne\"}"
+            )
+        else: # Cas du .txt (les 10 lignes que tu envoies)
+            prompt = (
+                f"Voici les 10 premières lignes d'un fichier .txt :\n'{sample_text}'\n"
+                "Analyse la structure pour extraire le label le plus pertinent (Titre, Sujet, etc.).\n"
+                "Est-ce la première ligne ? Un motif spécifique comme 'Titre: ...' ?\n"
+                "Format : {\"type\": \"txt_strategy\", \"key\": \"first_line\" | \"pattern\", \"pattern\": \"string_si_besoin\" | null}"
+            )
+            
+        return self._generate(prompt, system)
 
 # Instance unique
 llm = LLMManager()
