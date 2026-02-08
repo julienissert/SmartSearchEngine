@@ -149,6 +149,8 @@ class IngestionService:
                 results_gen = executor.map(_worker_load_file, tasks, chunksize=1)
                 
                 pbar = tqdm(total=len(tasks), desc=f" {archive_name[:15]}")
+                heartbeat = TqdmHeartbeat(pbar, archive_name[:15])
+                heartbeat.start()
                 stream_buffer = []
 
                 for docs in results_gen:
@@ -185,6 +187,7 @@ class IngestionService:
                     stream_buffer = stream_buffer[config.BATCH_SIZE:]
 
                 save_folder_contract(archive_path, "unknown", folder_sig, 0.0)
+                heartbeat.stop()
                 pbar.close()
                 clear_memory() # Libération immédiate
 
