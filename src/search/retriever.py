@@ -12,49 +12,47 @@ class MultiDomainRetriever:
         self.table = init_tables()
         logger.info("Moteur de recherche hybride LanceDB prêt.")
 
-    def search(self, processed_query: dict, k: int = 5):
-        """
-        Recherche chirurgicale : Utilise le vecteur CLIP + les filtres SQL du LLM.
-        """
-        vector = processed_query["vector"]
+    def search(self, processed_query: dict, k: int = 10):
+        """Recherche Tri-Pass : Visuelle Pure, Fusionnée et Label."""
+        fused_vec = processed_query["fused_vector"]
+        pure_vec = processed_query["pure_visual_vector"]
         filters = processed_query["filters"]
         ocr_text = processed_query["ocr_text"]
 
-        # 1. CONSTRUCTION DU FILTRE SQL (Metadata Filtering)
-        sql_filter = self._build_sql_filter(filters)
+        all_matches = []
 
         try:
-            # 2. EXÉCUTION DE LA RECHERCHE VECTORIELLE FILTRÉE
-            query = self.table.search(vector)
-            
+            # PASS 1 : Recherche Visuelle Pure (100% Précision Image)
+            # On cherche spécifiquement dans la colonne sans pollution textuelle
+            res_pure = self.table.search(pure_vec, vector_column_name="visual_pure").limit(k).to_pandas()
+            all_matches.append(res_pure)
+
+            # PASS 2 : Recherche Fusionnée (Sémantique & Contexte)
+            res_fused = self.table.search(fused_vec, vector_column_name="vector").limit(k).to_pandas()
+            all_matches.append(res_fused)
+
+            # PASS 3 : Recherche par Label (FTS / SQL LIKE)
+            sql_filter = self._build_sql_filter(filters)
             if sql_filter:
-                logger.info(f"Application des filtres SQL : {sql_filter}")
-                query = query.where(sql_filter)
+                res_label = self.table.search(fused_vec).where(sql_filter).limit(k).to_pandas()
+                all_matches.append(res_label)
+
+            # FUSION ET DÉDOUBLONNAGE
+            combined_df = pd.concat(all_matches).drop_duplicates(subset=['file_hash'])
             
-            results_df = query.limit(k).to_pandas()
-
-            # 3. FALLBACK (Sécurité)
-            if results_df.empty and sql_filter:
-                logger.warning("Filtres trop stricts, fallback sur recherche vectorielle pure.")
-                results_df = self.table.search(vector).limit(k).to_pandas()
-
-            # 4. SCORING ET FORMATAGE
+            # SCORING FINAL
             final_results = []
-            for _, row in results_df.iterrows():
+            for _, row in combined_df.iterrows():
                 res_dict = row.to_dict()
-                
                 scoring = TrustScorer.calculate_score(res_dict, ocr_text, filters)
-                
-                # On enrichit le dictionnaire avec les scores
                 res_dict["confidence_score"] = scoring["confidence"]
                 res_dict["confidence_details"] = scoring["details"]
                 final_results.append(res_dict)
 
-            # Tri par score de confiance décroissant
             return sorted(final_results, key=lambda x: x["confidence_score"], reverse=True)
 
         except Exception as e:
-            logger.error(f"Erreur lors de la recherche : {e}")
+            logger.error(f"Erreur Tri-Pass : {e}")
             return []
 
     def _build_sql_filter(self, filters: dict) -> str:

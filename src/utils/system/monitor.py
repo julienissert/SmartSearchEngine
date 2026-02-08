@@ -15,10 +15,10 @@ class SystemMonitor:
 
     def get_max_workers(self):
         # On réserve 12 Go pour le système et LanceDB
-        available_ram = max(0, self.total_ram - (8 * 1024 * 1024 * 1024))
-        ram_limit = int(available_ram / (1800 * 1024 * 1024)) 
+        available_ram = max(0, self.total_ram - (10 * 1024 * 1024 * 1024))
+        ram_limit = int(available_ram / (2500 * 1024 * 1024)) 
         cpu_limit = max(1, self.cpu_count - 2)
-        return max(1, min(cpu_limit, ram_limit, 12))
+        return max(1, min(cpu_limit, ram_limit, 8))
 
     def get_batch_size(self):
         if settings.DEVICE == "cuda":

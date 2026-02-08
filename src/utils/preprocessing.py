@@ -52,15 +52,12 @@ def compute_text_match_ratio(query: str, target_text: str) -> float:
     return min(1.0, matches / len(q_words))
 
 def calculate_folder_signature(folder_path):
+    """Signature ultra-rapide (O(1)) basée sur les métadonnées du dossier."""
     try:
-        p = Path(folder_path)
-        files = [f for f in p.rglob('*') if f.is_file()]
-        if not files: return None
-        
-        count = len(files)
-        total_size = sum(f.stat().st_size for f in files)
-        last_mod = max(f.stat().st_mtime for f in files)
-        
-        return hashlib.md5(f"{folder_path}_{count}_{total_size}_{last_mod}".encode()).hexdigest()
+        stats = os.stat(folder_path)
+        # On regarde uniquement : Date modif dossier + Nombre d'éléments directs
+        # Pas besoin d'aller voir chaque fichier à l'intérieur !
+        files_count = len(os.listdir(folder_path))
+        return hashlib.md5(f"{folder_path}_{stats.st_mtime}_{files_count}".encode()).hexdigest()
     except Exception:
         return None

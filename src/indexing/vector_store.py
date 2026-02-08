@@ -40,6 +40,8 @@ def init_tables():
         pa.field("domain_score", pa.float32()),
         pa.field("content", pa.string()),
         pa.field("snippet", pa.string()),
+        pa.field("visual_pure", pa.list_(pa.float32(), 512)),   
+        pa.field("image_linked", pa.string()), 
         pa.field("extra", pa.string())  
     ])
 
@@ -91,6 +93,8 @@ def add_documents(metadata_list, vector_list):
             "domain_score": float(meta.get('domain_score', 0.0)),
             "content": content_str[:20000], 
             "snippet": str(meta.get('snippet') or content_str[:500]),
+            "visual_pure": meta.get('visual_pure', [0.0] * 512),
+            "image_linked": str(meta.get('image_linked') or ''), 
             "extra": json.dumps(meta.get('extra', {}), ensure_ascii=False)
         })
 
@@ -98,10 +102,9 @@ def add_documents(metadata_list, vector_list):
     for attempt in range(MAX_RETRIES):
         try:
             table.add(rows)
-            return len(rows) # Succès !
+            return len(rows) 
             
         except Exception as e:
-            # On détecte si c'est une erreur de verrouillage fichier (propre à Windows)
             error_msg = str(e).lower()
             is_lock_error = any(x in error_msg for x in ["access denied", "locked", "being used", "permission denied"])
             

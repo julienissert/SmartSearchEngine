@@ -5,33 +5,31 @@ from src.utils.logger import setup_logger
 logger = setup_logger("TrustScorer")
 
 class TrustScorer:
-    """
-    Moteur de décision qui fusionne les preuves visuelles (CLIP) 
-    et textuelles (OCR) pour garantir la précision sur 30 Go.
-    """
+    """Moteur de décision par fusion vectorielle normalisée."""
 
     @staticmethod
     def calculate_score(result_row: dict, ocr_query: str, intent_filters: dict):
-        """
-        Formule  : Score = (Visuel * 0.5) + (Textuel * 0.4) + (Intention * 0.1)
-        """
-        # 1. PILIER VISUEL (50%) - Issu de la distance CLIP
-        distance = result_row.get("_distance", 1.0)
-        s_vis = max(0, 1 - distance)
+        # 1. Preuve Visuelle (Distance brute LanceDB)
+        # Similarity = 1 - Distance
+        s_vis = max(0.0, min(1.0, 1.0 - result_row.get("_distance", 1.0)))
 
-        # 2. PILIER TEXTUEL (40%) - Utilise l'utilitaire de preprocessing
-        # On compare l'OCR au label et au snippet fusionnés
-        target_content = f"{result_row.get('label', '')} {result_row.get('snippet', '')}"
-        s_txt = compute_text_match_ratio(ocr_query, target_content)
+        # 2. Preuve Textuelle (Ratio de Levenshtein)
+        target = f"{result_row.get('label', '')} {result_row.get('snippet', '')}"
+        s_txt = compute_text_match_ratio(ocr_query, target) if ocr_query else 0.0
 
-        # 3. PILIER INTENTION (10%) - Cohérence de domaine
+        # 3. Preuve d'Intention (Domaine)
         s_int = 1.0 if result_row.get("domain") == intent_filters.get("domain") else 0.0
 
-        # Fusion finale
-        final_score = (s_vis * 0.5) + (s_txt * 0.4) + (s_int * 0.1)
+        # --- CALCUL DE LA CONFIANCE PROUVÉE ---
+        # Définition des coefficients de crédibilité
+        w_vis = 0.6  # Poids Visuel
+        w_txt = 0.3 if ocr_query else 0.0  # Poids Textuel (0 si pas de recherche texte)
+        w_int = 0.1  # Poids Intention
+
+        total_weight = w_vis + w_txt + w_int
+        final_score = ((s_vis * w_vis) + (s_txt * w_txt) + (s_int * w_int)) / total_weight
         
         return {
             "confidence": round(final_score * 100, 2),
             "details": {"visual": s_vis, "textual": s_txt, "intent": s_int}
         }
-    

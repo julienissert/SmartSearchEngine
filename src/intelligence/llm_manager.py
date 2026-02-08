@@ -6,6 +6,7 @@ import os
 import sys
 from src import config
 from src.utils.logger import setup_logger
+from src.ingestion.dispatcher import VISUAL_EXTENSIONS
 
 logger = setup_logger("LLMManager")
 
@@ -219,5 +220,11 @@ class LLMManager:
             
         return self._generate(prompt, system)
 
-# Instance unique
-llm = LLMManager()
+_llm_instance = None 
+
+def get_llm():
+    """Retourne l'instance LLM uniquement si elle est nécessaire."""
+    global _llm_instance
+    if _llm_instance is None:
+        _llm_instance = LLMManager()
+    return _llm_instance

@@ -13,7 +13,7 @@ from src.intelligence.domain_detector import detect_domain
 from src.intelligence.label_detector import detect_label
 from src.indexing.vector_store import add_documents, get_folder_contract, save_folder_contract
 from src.utils.logger import setup_logger
-from src.intelligence.llm_manager import llm  
+from src.intelligence.llm_manager import get_llm
 from src.ingestion.dispatcher import is_visual_type
 
 _BATCH_COUNTER = 0
@@ -31,26 +31,31 @@ def _get_archive_entity(source_path):
     return os.path.dirname(source_path)
 
 def process_batch(batch_docs, valid_labels):
-
     global _BATCH_COUNTER
     if not batch_docs: 
         return 0, "unknown", 0.0
 
     _BATCH_COUNTER += 1
 
-    # --- ÉTAPE 1 : CHARGEMENT JIT (Just In Time) ---
+    # --- ÉTAPE 1 : CHARGEMENT JIT MULTIMODAL (Modifié) ---
     actual_images = []
     for d in batch_docs:
         img = None
-        source = str(d.get('source', ''))
+        # PRIORITÉ 1 : L'image liée via un fichier structuré (CSV/JSON/TXT)
+        img_target = d.get('image_path') 
         
-        if is_visual_type(source):
+        # PRIORITÉ 2 : Le fichier source lui-même (si c'est un format image)
+        if not img_target and is_visual_type(str(d.get('source', ''))):
+            img_target = d.get('source')
+        
+        if img_target:
             try:
-                img = Image.open(source).convert('RGB')
-            except Exception:
+                img = Image.open(img_target).convert('RGB')
+            except Exception as e:
+                logger.warning(f"Échec ouverture image {img_target}: {e}")
                 img = None
         actual_images.append(img)
-
+        
     # --- ÉTAPE 2 : VECTORISATION BATCH ---
     texts = [str(d.get('content') or '') for d in batch_docs]
     
@@ -69,7 +74,6 @@ def process_batch(batch_docs, valid_labels):
                 
     except Exception as e:
         logger.error(f"Erreur fatale lors de la vectorisation du batch : {e}")
-        # Sécurité : on ferme les images ouvertes avant de quitter
         for img in actual_images:
             if img: img.close()
         return 0, "unknown", 0.0
@@ -84,11 +88,16 @@ def process_batch(batch_docs, valid_labels):
         try:
             vecs = [v for v in [text_vectors[i], image_vectors[i]] if v is not None]
             final_vector = np.mean(vecs, axis=0) if vecs else np.zeros(config.EMBEDDING_DIM)
-            
+            img_vec = image_vectors[i]
+            if img_vec is not None and hasattr(img_vec, "tolist"):
+                pure_visual = img_vec.tolist()
+            else:
+                pure_visual = [0.0] * 512
             doc['image'] = actual_images[i] 
             
             # Analyse IA (Domaine, Label, Score) - Récupération du triplet
             meta, domain, score = _prepare_document_metadata(doc, final_vector, image_vectors[i], valid_labels)
+            meta['visual_pure'] = pure_visual
             
             if domain != "unknown":
                 last_domain = domain
@@ -126,7 +135,9 @@ def process_batch(batch_docs, valid_labels):
     return indexed_count, last_domain, last_score
 
 def _prepare_document_metadata(doc, vector, img_vector, valid_labels):
-   
+    if doc.get("extra") is None:
+        doc["extra"] = {}
+    
     source_path = doc["source"]
     raw_content = doc.get("content") 
     content_str = str(raw_content or "")
@@ -137,19 +148,14 @@ def _prepare_document_metadata(doc, vector, img_vector, valid_labels):
     c_domain = contract.get("assigned_domain") if contract else None
     c_score = contract.get("confidence") if contract else 0.0
     
+    # 1. Détection du Domaine (IA / Contrat / Session)
     if c_domain and c_domain != "unknown":
-        domain = c_domain
-        actual_score = c_score
+        domain, actual_score, method = c_domain, c_score, "contract_trust"
         score = 1.0 
-        method = "contract_trust"
-        
     elif archive_path in _SESSION_IA_CACHE:
         cache = _SESSION_IA_CACHE[archive_path]
-        domain = cache['domain']
-        actual_score = cache['score']
-        score = 1.0 # Validation par session
-        method = "session_cache" 
-           
+        domain, actual_score, method = cache['domain'], cache['score'], "session_cache"
+        score = 1.0
     else:
         domain_res, probs, detect_method = detect_domain(
             filepath=source_path, 
@@ -160,33 +166,31 @@ def _prepare_document_metadata(doc, vector, img_vector, valid_labels):
         actual_score = probs.get(domain, 0.0) if isinstance(probs, dict) else 0.0
         method = detect_method
 
-        # Arbitrage LLM si CLIP est incertain ET Ollama est dispo
-        # (Le timeout est géré par la config dans llm_manager)
-        if actual_score < 0.8 and llm.is_healthy():
+        # Arbitrage LLM si incertitude
+        if actual_score < 0.8 and get_llm().is_healthy():
             logger.info(f"Arbitrage LLM requis pour : {os.path.basename(source_path)}")
-            res = llm.arbitrate_domain(content_str, probs, source_path)
+            res = get_llm().arbitrate_domain(content_str, probs, source_path)
             
             domain = res.get("final_domain", domain)
             actual_score = float(res.get("confidence", actual_score))
             method = "llm_arbitration"
             doc["extra"]["llm_justification"] = res.get("justification")
             
-            # --- CRUCIAL : On mémorise en RAM pour les 1000 prochaines lignes du CSV ---
             _SESSION_IA_CACHE[archive_path] = {"domain": domain, "score": actual_score}
         
         score = actual_score
 
-    # 2. Résolution du Label (Intelligence niveau 3)
+    # 2. Résolution du Label (Niveau 3)
     label = detect_label(
         filepath=source_path, 
         content=raw_content, 
-        image=doc.get('image'),
+        image=doc.get('image'), 
         image_vector=img_vector, 
         label_mapping=valid_labels,
         type=doc.get('type')
     )
 
-    # 3. Métadonnées finales
+    # 3. Assemblage Final des Métadonnées
     metadata = {
         "source": source_path,
         "file_hash": doc.get("file_hash"),
@@ -195,13 +199,13 @@ def _prepare_document_metadata(doc, vector, img_vector, valid_labels):
         "label": label,
         "domain_score": round(float(score), 4),
         "content": content_str[:20000], 
-        "snippet": content_str[:500],   
+        "snippet": content_str[:500],
+        "image_linked": doc.get("image_path"), 
         "extra": {
-            **doc.get("extra", {}), 
+            **doc["extra"], 
             "detection_method": method,
             "ingested_at": time.time(),
             "ram_usage": f"{psutil.virtual_memory().percent}%"
         }
     }
-
     return metadata, domain, actual_score

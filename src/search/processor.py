@@ -4,7 +4,7 @@ from PIL import Image
 from paddleocr import PaddleOCR
 from src.embeddings.image_embeddings import embed_image
 from src.utils.logger import setup_logger
-from src.intelligence.llm_manager import llm
+from src.intelligence.llm_manager import get_llm
 from src import config
 logger = setup_logger("Processor")
 
@@ -18,43 +18,37 @@ except Exception as e:
     ocr_engine = None
 
 def analyze_query(pil_image: Image.Image):
-    """
-    Transforme l'image en vecteur (CLIP) et extrait le texte (PaddleOCR).
-    """
-    
-    # 1. Encodage vectoriel (Image -> Vector)
+    """Prépare les vecteurs de recherche (fused et pure_visual)."""
+    # 1. Encodage CLIP (Image -> Vector)
     vector = embed_image(pil_image)
     
-    # 2. Extraction OCR (Image -> Text)
+    # 2. Extraction OCR
     ocr_text = ""
-    
     if ocr_engine:
-        try:
-            # Conversion PIL (RGB) -> Numpy Array pour Paddle
-            img_array = np.array(pil_image)            
-            result = ocr_engine.ocr(img_array, cls=True)
-            extracted_lines = []
-            if result and result[0]:
-                for line in result[0]:
-                    text_detected = line[1][0]
-                    confidence = line[1][1]                   
-                    if confidence > 0.5: 
-                        extracted_lines.append(text_detected)           
-            ocr_text = " ".join(extracted_lines).strip()            
-        except Exception as e:
-            logger.error(f"Erreur lors du processing OCR : {e}")
-            ocr_text = ""
+        img_array = np.array(pil_image)
+        result = ocr_engine.ocr(img_array, cls=True)
+        if result and result[0]:
+            extracted_lines = [line[1][0] for line in result[0] if line[1][1] > 0.5]
+            ocr_text = " ".join(extracted_lines).strip()
     
-    # 3. LLM : Analyse de l'intention (Filtres intelligents)
-    # On n'appelle le LLM que si on a assez de texte pour être utile
+    # 3. Analyse d'intention via LLM
     if len(ocr_text) > 4:
-        intent = llm.analyze_scan_intent(ocr_text)
+        intent = get_llm().analyze_scan_intent(ocr_text)
     else:
         intent = {"domain": "unknown", "label": "unknown", "type": "image"}
+
+    # --- ÉVOLUTION DOUBLE VECTEUR ---
+    # Si on a du texte OCR, on génère aussi un vecteur texte pour fusionner
+    from src.embeddings.text_embeddings import embed_text
+    t_vec = embed_text(ocr_text) if ocr_text else None
     
-    # ON RENVOIE TOUT : Le vecteur CLIP ET les filtres LLM
+    # Calcul du vecteur fusionné (Moyenne IA)
+    vecs = [v for v in [t_vec, vector] if v is not None]
+    fused_vector = np.mean(vecs, axis=0) if vecs else vector
+
     return {
-        "vector": vector,    # Pour LanceDB .search()
+        "fused_vector": fused_vector,     # Pour la recherche sémantique globale
+        "pure_visual_vector": vector,    # Pour le match 100% image
         "ocr_text": ocr_text,
-        "filters": intent    # Pour LanceDB .where()
+        "filters": intent
     }

@@ -3,7 +3,7 @@ import importlib
 from src import config  
 from src.utils.logger import setup_logger 
 # On importe l'instance singleton du LLM Manager
-from src.intelligence.llm_manager import llm
+from src.intelligence.llm_manager import get_llm
 
 logger = setup_logger("EnvChecker")
 
@@ -44,12 +44,12 @@ def check_environment():
 
     # 3. VÉRIFICATION OLLAMA (Via le singleton LLMManager)
     # Note : Le LLMManager a déjà tenté de se connecter lors de son import
-    if not llm.is_healthy():
+    if not get_llm().is_healthy():
         logger.warning("⚠️ Ollama n'est pas détecté ou ne répond pas. L'intelligence sera désactivée.")
         # On ne bloque pas forcément l'app, mais on prévient
     else:
         # CORRECTION ICI : On utilise llm.model au lieu de config.LLM_MODEL pour éviter l'AttributeError
-        logger.info(f"✅ Ollama est opérationnel (Modèle actif : {llm.model})")
+        logger.info(f"✅ Ollama est opérationnel (Modèle actif : {get_llm().model})")
         
     logger.info("Structure de l'application validée (LanceDB Store).")
     logger.info(f"Matériel utilisé pour l'inférence : {config.DEVICE}")
