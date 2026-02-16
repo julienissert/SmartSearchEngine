@@ -23,7 +23,6 @@ class MultiDomainRetriever:
 
         try:
             # PASS 1 : Recherche Visuelle Pure (100% Précision Image)
-            # On cherche spécifiquement dans la colonne sans pollution textuelle
             res_pure = self.table.search(pure_vec, vector_column_name="visual_pure").limit(k).to_pandas()
             all_matches.append(res_pure)
 

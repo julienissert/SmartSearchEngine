@@ -106,6 +106,10 @@ class IngestionService:
             _, _, folder_sig = files_info[0] 
             logger.info(f"\n>>> Traitement Dataset : {archive_name}")
 
+            # --- AJOUT : Initialisation des variables de suivi pour ce dossier ---
+            detected_domain = "unknown"
+            best_confidence = 0.0
+
             # 1. Analyse IA et plans
             context = analyze_dataset_structure(archive_path)
             plans = context.get('file_plans', {})
@@ -142,7 +146,7 @@ class IngestionService:
             with concurrent.futures.ProcessPoolExecutor(
                 max_workers=monitor.get_max_workers(),
                 initializer=_init_worker,
-                initargs=(context,) # Injecté une seule fois pour économiser la RAM
+                initargs=(context,)
             ) as executor:
 
                 tasks = [(f, h) for f, h, _ in files_info if os.path.abspath(f).lower() not in resolved_images_to_skip]
@@ -157,39 +161,41 @@ class IngestionService:
                     pbar.update(1)
                     if not docs: continue
                     for doc in docs:
-                        
-                        # SMART LINKING : Le thread principal fait le lien via l'image_map
-                        plan = plans.get(os.path.abspath(doc['source']).lower())
-                        if plan and isinstance(doc.get('content'), dict):
-                            img_val = doc['content'].get(plan['path_key'])
-                            if img_val:
-                                full_path = image_map.get(str(img_val).strip().lower())
-                                if full_path:
-                                    doc['image_path'] = full_path
-                                    doc.setdefault('extra', {})['multimodal_fusion'] = True
-                                    pbar.update(1)
+                        # ... (votre code existant pour le smart linking) ...
                         stream_buffer.append(doc)
                         
-                        # --- CORRECTIF : Flush du lot dès qu'on atteint la limite ---
                         if len(stream_buffer) >= config.BATCH_SIZE:
-                            monitor.throttle() # Check RAM
-                            count, _, _ = process_batch(stream_buffer, context) # process_batch gère le découpage
+                            monitor.throttle() 
+                            # --- MODIFICATION : On capture le domaine et le score ---
+                            count, domain, score = process_batch(stream_buffer, context) 
+                            
+                            if domain != "unknown":
+                                detected_domain = domain
+                                best_confidence = score
+
                             total_indexed += count
                             pbar.update(len(stream_buffer))
-                            stream_buffer = [] # Reset buffer après traitement
+                            stream_buffer = []
 
-                # --- CORRECTIF : Flush final par petits lots ---
+                # --- MODIFICATION : On capture aussi les infos pour le flush final ---
                 while stream_buffer:
                     chunk = stream_buffer[:config.BATCH_SIZE]
-                    count, _, _ = process_batch(chunk, context)
+                    count, domain, score = process_batch(chunk, context)
+                    
+                    if domain != "unknown":
+                        detected_domain = domain
+                        best_confidence = score
+
                     total_indexed += count
                     pbar.update(len(chunk))
                     stream_buffer = stream_buffer[config.BATCH_SIZE:]
 
-                save_folder_contract(archive_path, "unknown", folder_sig, 0.0)
+                # --- MODIFICATION : On enregistre le VRAI domaine détecté ---
+                save_folder_contract(archive_path, detected_domain, folder_sig, best_confidence)
+                
                 heartbeat.stop()
                 pbar.close()
-                clear_memory() # Libération immédiate
+                clear_memory()
 
         if total_indexed > 0: create_vector_index()
         return total_indexed, sum(len(v) for v in grouped_files.values())
