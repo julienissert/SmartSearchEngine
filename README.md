@@ -158,6 +158,26 @@ docker compose up -d search
 
 ```
 
+## 3. Déclaration des domaines
+
+La gestion des domaines (catégories) que le système doit détecter et indexer est centralisée dans le fichier docker-compose.yml.
+
+Vous devez modifier la variable d'environnement TARGET_DOMAINS pour y lister vos labels spécifiques, séparés par des virgules.
+
+```bash
+environment:
+    - TRANSFORMERS_CACHE=/root/.cache/huggingface
+    - OCR_LANG=latin
+    - PYTHONPATH=/app
+    # ... autres variables ...
+    
+    # DÉFINITION DES DOMAINES CIBLES ICI
+    - TARGET_DOMAINS=food,medical,cars,finance
+    
+    # CONFIGURATION LLM
+    - OLLAMA_HOST=ollama
+```
+
 ## 4. Vérification et Logs
 
 Pour vérifier que tout fonctionne correctement ou diagnostiquer une erreur :

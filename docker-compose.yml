@@ -1,11 +1,11 @@
 version: '3.8'
 
-# Configuration commune pour éviter les répétitions (DRY)
+# Configuration commune pour Ã©viter les rÃ©pÃ©titions (DRY)
 x-common-config: &common-config
-  image: julienisrt/smartsearchengine:v3.1.1
-  build: # Décommentez pour builder localement si vous modifiez le code
-    context: .
-    dockerfile: Dockerfile
+  image: julienisrt/smartsearchengine:v5.1.0
+  # build: # DÃ©commentez pour builder localement si vous modifiez le code
+  #   context: .
+  #   dockerfile: Dockerfile
   environment:
     - TRANSFORMERS_CACHE=/root/.cache/huggingface
     - OCR_LANG=latin
@@ -16,7 +16,7 @@ x-common-config: &common-config
     # CONFIGURATION LLM
     - OLLAMA_HOST=ollama
     - LLM_MODEL_NAME=mistral
-    # Active la visibilité GPU pour PyTorch/Ollama
+    # Active la visibilitÃ© GPU pour PyTorch/Ollama
     - NVIDIA_VISIBLE_DEVICES=all
   volumes:
     - ./raw-datasets:/app/raw-datasets
@@ -65,8 +65,8 @@ services:
     image: ollama/ollama:latest
     container_name: smartsearch_ollama
     volumes:
-      # PERSISTANCE : Stocke les modèles (Mistral, etc.) sur le disque hôte
-      # pour ne pas les retélécharger à chaque redémarrage.
+      # PERSISTANCE : Stocke les modÃ¨les (Mistral, etc.) sur le disque hÃ´te
+      # pour ne pas les retÃ©lÃ©charger Ã  chaque redÃ©marrage.
       - ./ollama_data:/root/.ollama
     ports:
       - "11434:11434"
